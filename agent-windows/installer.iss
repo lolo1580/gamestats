@@ -86,25 +86,35 @@ var
 
 function ReadJsonString(const FileName, Key: string): string;
 var
+  Lines: TStringList;
   Content, Pattern, Rest: string;
   P: Integer;
 begin
   Result := '';
-  if not LoadStringFromFileInCP(FileName, Content, 65001) then
-    exit;
-  Pattern := '"' + Key + '"';
-  P := Pos(Pattern, Content);
-  if P = 0 then
-    exit;
-  Rest := Copy(Content, P + Length(Pattern), Length(Content));
-  P := Pos('"', Rest);
-  if P = 0 then
-    exit;
-  Rest := Copy(Rest, P + 1, Length(Rest));
-  P := Pos('"', Rest);
-  if P = 0 then
-    exit;
-  Result := Copy(Rest, 1, P - 1);
+  Lines := TStringList.Create;
+  try
+    try
+      Lines.LoadFromFile(FileName);
+    except
+      exit;
+    end;
+    Content := Lines.Text;
+    Pattern := '"' + Key + '"';
+    P := Pos(Pattern, Content);
+    if P = 0 then
+      exit;
+    Rest := Copy(Content, P + Length(Pattern), Length(Content));
+    P := Pos('"', Rest);
+    if P = 0 then
+      exit;
+    Rest := Copy(Rest, P + 1, Length(Rest));
+    P := Pos('"', Rest);
+    if P = 0 then
+      exit;
+    Result := Copy(Rest, 1, P - 1);
+  finally
+    Lines.Free;
+  end;
 end;
 
 function ParamValue(const Name, DefaultValue: string): string;
