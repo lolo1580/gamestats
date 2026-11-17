@@ -90,7 +90,7 @@ var
   P: Integer;
 begin
   Result := '';
-  if not LoadStringFromFile(FileName, Content) then
+  if not LoadStringFromFileInCP(FileName, Content, 65001) then
     exit;
   Pattern := '"' + Key + '"';
   P := Pos(Pattern, Content);
