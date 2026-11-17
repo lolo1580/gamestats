@@ -50,7 +50,7 @@ def default_games_path() -> Path:
 
 def load_settings_file(path: Path) -> dict[str, Any]:
     try:
-        raw = path.read_text(encoding="utf-8")
+        raw = path.read_text(encoding="utf-8-sig")
     except FileNotFoundError:
         return {}
     except OSError as exc:
@@ -287,7 +287,7 @@ def heartbeat_endpoint(server: str) -> str:
 
 def load_game_mappings(path: Path) -> list[dict[str, Any]]:
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8-sig"))
     except FileNotFoundError as exc:
         raise ValueError(f"Fichier de configuration introuvable : {path}") from exc
     except json.JSONDecodeError as exc:
