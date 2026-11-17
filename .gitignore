@@ -31,3 +31,7 @@ frontend/.vite/
 agent-windows/.venv-build/
 agent-windows/build/
 agent-windows/dist/
+
+# Windows agent downloads (served by the backend)
+downloads/*.exe
+downloads/*.zip

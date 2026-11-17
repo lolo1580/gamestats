@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
     metadata_sync_minutes: int = 360
     metadata_enrich_limit: int = 8
     opencritic_enrich_limit: int = 4
+    downloads_dir: str = str(Path(__file__).resolve().parent.parent / "downloads")
     igdb_enrich_limit: int = 8
     steam_achievement_limit: int = 8
     session_days: int = 7

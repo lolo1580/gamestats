@@ -18,8 +18,10 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: sqlite:////data/gamestats.db
+      DOWNLOADS_DIR: /downloads
     volumes:
       - ./data:/data
+      - ./downloads:/downloads:ro
     ports:
       - "${BACKEND_PORT:-8091}:8000"
     healthcheck:

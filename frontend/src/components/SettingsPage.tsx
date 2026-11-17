@@ -24,12 +24,13 @@ import {
 } from 'lucide-react'
 import { api, ApiError, docsLinks } from '../api'
 import type {
+  AgentRelease,
   AppSettings,
   CurrentUser,
   SettingsUpdatePayload,
   UserRole,
 } from '../types'
-import { formatRelative } from '../format'
+import { formatFileSize, formatRelative } from '../format'
 import { useI18n } from '../i18n'
 import type { TranslationKey } from '../i18n'
 
@@ -99,6 +100,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
   const [opencriticKey, setOpencriticKey] = useState('')
   const [hltbEnabled, setHltbEnabled] = useState(true)
   const [metadataBusy, setMetadataBusy] = useState(false)
+  const [agentRelease, setAgentRelease] = useState<AgentRelease | null>(null)
 
   const [newUsername, setNewUsername] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -122,16 +124,19 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
     setLoading(true)
     setError(null)
     try {
-      const [nextSettings, nextUsers, gogAuth, epicAuth] = await Promise.all([
-        api.settings(),
-        api.users(),
-        api.gogAuthUrl().catch(() => null),
-        api.epicAuthUrl().catch(() => null),
-      ])
+      const [nextSettings, nextUsers, gogAuth, epicAuth, release] =
+        await Promise.all([
+          api.settings(),
+          api.users(),
+          api.gogAuthUrl().catch(() => null),
+          api.epicAuthUrl().catch(() => null),
+          api.agentRelease().catch(() => null),
+        ])
       setSettings(nextSettings)
       setUsers(nextUsers)
       if (gogAuth) setGogAuthUrl(gogAuth.url)
       if (epicAuth) setEpicAuthUrl(epicAuth.url)
+      setAgentRelease(release)
       setTimezone(nextSettings.timezone)
       setSteamId(nextSettings.steam_id)
       setIgdbClientId(nextSettings.igdb_client_id)
@@ -894,6 +899,47 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                 url: `${window.location.origin}/api/heartbeat`,
               })}
             </p>
+
+            <div className="settings-group">
+              <h3>{t('settings.agent.downloadTitle')}</h3>
+              <p className="settings-hint">
+                {t('settings.agent.downloadSubtitle')}
+              </p>
+              {agentRelease &&
+              (agentRelease.installer_available ||
+                agentRelease.portable_available) ? (
+                <div className="settings-actions">
+                  {agentRelease.installer_available && (
+                    <a
+                      className="button"
+                      href={api.agentDownloadUrl('installer')}
+                    >
+                      <Download size={14} strokeWidth={2} />
+                      {t('settings.agent.downloadInstaller')}
+                      {agentRelease.installer_size
+                        ? ` (${formatFileSize(agentRelease.installer_size, lang)})`
+                        : ''}
+                    </a>
+                  )}
+                  {agentRelease.portable_available && (
+                    <a
+                      className="button"
+                      href={api.agentDownloadUrl('portable')}
+                    >
+                      <Download size={14} strokeWidth={2} />
+                      {t('settings.agent.downloadPortable')}
+                      {agentRelease.portable_size
+                        ? ` (${formatFileSize(agentRelease.portable_size, lang)})`
+                        : ''}
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <p className="settings-hint">
+                  {t('settings.agent.downloadMissing')}
+                </p>
+              )}
+            </div>
           </section>
         </div>
       )}

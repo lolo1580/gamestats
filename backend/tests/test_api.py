@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from types import SimpleNamespace
 
 import httpx
 
@@ -1005,3 +1006,40 @@ def test_metadata_sync_maps_providers(client, monkeypatch):
     assert settings["opencritic_configured"] is True
     assert settings["hltb_enabled"] is True
     assert settings["metadata_last_sync_at"] is not None
+def test_agent_release_without_files(client, monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "routes_agent.get_settings",
+        lambda: SimpleNamespace(downloads_dir=str(tmp_path)),
+    )
+    release = client.get("/api/agent/release")
+    assert release.status_code == 200
+    body = release.json()
+    assert body["installer_available"] is False
+    assert body["portable_available"] is False
+    assert client.get("/api/agent/download/installer").status_code == 404
+    assert client.get("/api/agent/download/portable").status_code == 404
+
+
+def test_agent_release_serves_downloads(client, monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "routes_agent.get_settings",
+        lambda: SimpleNamespace(downloads_dir=str(tmp_path)),
+    )
+    (tmp_path / "GameStatsAgentSetup.exe").write_bytes(b"MZ-test-installer")
+    (tmp_path / "GameStatsAgent-portable.zip").write_bytes(b"PK-test-portable")
+
+    release = client.get("/api/agent/release").json()
+    assert release["installer_available"] is True
+    assert release["installer_size"] == len(b"MZ-test-installer")
+    assert release["portable_available"] is True
+    assert release["portable_size"] == len(b"PK-test-portable")
+
+    installer = client.get("/api/agent/download/installer")
+    assert installer.status_code == 200
+    assert installer.content == b"MZ-test-installer"
+    assert "GameStatsAgentSetup.exe" in installer.headers["content-disposition"]
+
+    portable = client.get("/api/agent/download/portable")
+    assert portable.status_code == 200
+    assert portable.content == b"PK-test-portable"
+    assert "GameStatsAgent-portable.zip" in portable.headers["content-disposition"]

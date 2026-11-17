@@ -77,7 +77,9 @@ Depuis `agent-windows/` :
 ```
 
 Le script crée un environnement virtuel, installe PyInstaller, construit
-`GameStatsAgent.exe`, puis `GameStatsAgentSetup.exe` dans `dist/`.
+`GameStatsAgent.exe`, puis `GameStatsAgentSetup.exe` dans `dist/`. Il copie aussi
+automatiquement l’installateur et l’archive portable dans `../downloads/` pour
+les rendre disponibles depuis le serveur GameStats local.
 
 Pour ne construire que l’exécutable :
 
@@ -91,6 +93,18 @@ Le workflow `.github/workflows/agent-windows.yml` construit automatiquement
 l’exécutable et l’installateur sur `windows-latest`. Lancez-le manuellement
 depuis l’onglet **Actions** du dépôt, ou poussez un tag `agent-v1.1.0` pour
 attacher les fichiers à une release GitHub.
+
+## Publication sur le serveur local
+
+Le backend monte le dossier `downloads/` du dépôt en lecture seule sur
+`/downloads`. Placez-y les fichiers suivants :
+
+- `GameStatsAgentSetup.exe`
+- `GameStatsAgent-portable.zip` (optionnel)
+
+Ils sont alors téléchargeables depuis **GameStats → Paramètres → Général →
+Agent Windows**. `build.ps1` effectue cette copie automatiquement après chaque
+build. Les binaires sont ignorés par Git.
 
 ## Exécution en développement
 

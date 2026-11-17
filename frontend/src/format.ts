@@ -156,3 +156,23 @@ export function initials(name: string): string {
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count > 1 ? plural : singular}`
 }
+
+export function formatFileSize(
+  bytes: number | null,
+  lang: Language = 'fr',
+): string {
+  if (!bytes || bytes <= 0) return '—'
+  const units =
+    lang === 'fr' ? ['o', 'Ko', 'Mo', 'Go'] : ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let index = 0
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024
+    index += 1
+  }
+  const formatted =
+    value >= 10 || index === 0
+      ? Math.round(value).toString()
+      : value.toFixed(1).replace('.', lang === 'fr' ? ',' : '.')
+  return `${formatted} ${units[index]}`
+}

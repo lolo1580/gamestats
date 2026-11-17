@@ -152,6 +152,13 @@ export interface EpicResult {
   message: string | null
 }
 
+export interface AgentRelease {
+  installer_available: boolean
+  installer_size: number | null
+  portable_available: boolean
+  portable_size: number | null
+}
+
 export interface MetadataSyncResult {
   skipped: boolean
   reason: string | null

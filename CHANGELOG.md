@@ -53,8 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON settings support for the Windows agent, with per-user configuration,
   games list, and log files under `%APPDATA%\GameStats`.
 - GitHub Actions workflow that publishes backend and frontend preview images to
-  GHCR with `preview-latest` and `preview-YYYY-MM-DD-1` tags, plus a
-  `compose.preview.yml` override for running the published images.
+  GHCR with `preview-latest` and `preview-YYYY-MM-DD-1` tags, plus a standalone
+  `compose.preview.yml` file for running the published images.
+- Local agent download from the GameStats server: files placed in `downloads/`
+  are served by the backend and exposed in Settings → General.
 
 ### Changed
 

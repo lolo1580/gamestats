@@ -17,6 +17,7 @@ from config import get_settings
 from database import SessionLocal, get_db, init_db
 from heartbeat import process_heartbeat
 from models import Agent, User, utcnow
+from routes_agent import router as agent_router
 from routes_auth import router as auth_router
 from routes_backup import router as backup_router
 from routes_gog import router as gog_router
@@ -106,6 +107,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(agent_router)
 app.include_router(users_router)
 app.include_router(settings_router)
 app.include_router(backup_router)

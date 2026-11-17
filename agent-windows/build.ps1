@@ -29,8 +29,18 @@ if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller build failed."
 }
 
+$Dist = Join-Path $Root "dist"
+$Portable = Join-Path $Dist "GameStatsAgent-portable.zip"
+Compress-Archive -Path (Join-Path $Dist "GameStatsAgent\*") `
+    -DestinationPath $Portable -Force
+
+$Downloads = Join-Path (Split-Path -Parent $Root) "downloads"
+New-Item -ItemType Directory -Force -Path $Downloads | Out-Null
+
 if ($SkipInstaller) {
-    Write-Host "Executable built: $Root\dist\GameStatsAgent\GameStatsAgent.exe"
+    Copy-Item $Portable $Downloads -Force
+    Write-Host "Executable built: $Dist\GameStatsAgent\GameStatsAgent.exe"
+    Write-Host "Published: $Downloads\GameStatsAgent-portable.zip"
     exit 0
 }
 
@@ -51,4 +61,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup build failed."
 }
 
-Write-Host "Installer built: $Root\dist\GameStatsAgentSetup.exe"
+$Installer = Join-Path $Dist "GameStatsAgentSetup.exe"
+Copy-Item $Installer $Downloads -Force
+Copy-Item $Portable $Downloads -Force
+
+Write-Host "Installer built: $Installer"
+Write-Host "Published: $Downloads\GameStatsAgentSetup.exe"
+Write-Host "Published: $Downloads\GameStatsAgent-portable.zip"

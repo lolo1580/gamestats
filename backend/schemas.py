@@ -229,6 +229,13 @@ class MetadataSyncOut(BaseModel):
     last_sync_at: str | None = None
 
 
+class AgentReleaseOut(BaseModel):
+    installer_available: bool
+    installer_size: int | None = None
+    portable_available: bool
+    portable_size: int | None = None
+
+
 class HeartbeatGameIn(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     process: str | None = Field(default=None, max_length=255)

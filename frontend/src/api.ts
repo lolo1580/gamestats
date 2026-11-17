@@ -1,5 +1,6 @@
 import type {
   AgentInfo,
+  AgentRelease,
   AppSettings,
   AuthStatus,
   CurrentUser,
@@ -176,6 +177,9 @@ export const api = {
   deleteUser: (id: number) => del<void>(`/users/${id}`),
 
   settings: () => get<AppSettings>('/settings'),
+  agentRelease: () => get<AgentRelease>('/agent/release'),
+  agentDownloadUrl: (kind: 'installer' | 'portable') =>
+    `${API_BASE}/agent/download/${kind}`,
   updateSettings: (payload: SettingsUpdatePayload) =>
     patch<AppSettings>('/settings', payload),
   revealAgentKey: () => get<{ agent_api_key: string }>('/settings/agent-key'),

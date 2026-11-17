@@ -342,6 +342,13 @@ Build it on Windows with `agent-windows\build.ps1`, or run the
 **Build Windows agent** GitHub Actions workflow and download the artifact. See
 [agent-windows/README.md](agent-windows/README.md) for details.
 
+The installer can also be served directly by the local GameStats server. Place
+`GameStatsAgentSetup.exe` (and optionally `GameStatsAgent-portable.zip`) in the
+`downloads/` directory at the repository root. The backend mounts it read-only
+at `/downloads`, and the files become available in
+**Settings → Général → Windows agent**. `agent-windows/build.ps1` copies new
+builds there automatically. The binaries are ignored by Git.
+
 The installed agent stores its configuration in `%APPDATA%\GameStats\agent.json`,
 the watched games in `%APPDATA%\GameStats\games.json`, and its log in
 `%APPDATA%\GameStats\agent.log`.
@@ -529,6 +536,7 @@ a reverse proxy or restrict it to your LAN.
 ```text
 gamestats/
 ├── compose.yml
+├── compose.preview.yml
 ├── .env.example
 ├── backend/
 │   ├── main.py              # FastAPI app and routes
@@ -564,6 +572,7 @@ gamestats/
 │   ├── GameStatsAgent.spec # PyInstaller build
 │   ├── installer.iss     # Inno Setup installer
 │   └── build.ps1         # Windows build script
+├── downloads/            # Optional local agent downloads (binaries ignored)
 └── frontend/
     └── src/                 # Auth, dashboard, settings, sessions, library
 ```
