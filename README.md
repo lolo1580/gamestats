@@ -420,7 +420,8 @@ name to its executable(s):
 
 `steam_app_id` is optional but recommended: it merges the agent game with the
 matching Steam entry. Restart the agent after editing the file. To find the exact
-process name on Windows:
+process name on Windows, run the agent with `--list-processes` (already watched
+processes are marked with `*`), or list them directly:
 
 ```powershell
 Get-Process | Select-Object Name

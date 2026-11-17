@@ -3,8 +3,8 @@
 # Version metadata embedded in GameStatsAgent.exe.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 1, 0, 0),
-    prodvers=(1, 1, 0, 0),
+    filevers=(1, 2, 0, 0),
+    prodvers=(1, 2, 0, 0),
     mask=0x3F,
     flags=0x0,
     OS=0x40004,
@@ -20,11 +20,11 @@ VSVersionInfo(
           [
             StringStruct("CompanyName", "GameStats"),
             StringStruct("FileDescription", "GameStats Agent"),
-            StringStruct("FileVersion", "1.1.0"),
+            StringStruct("FileVersion", "1.2.0"),
             StringStruct("InternalName", "GameStatsAgent"),
             StringStruct("OriginalFilename", "GameStatsAgent.exe"),
             StringStruct("ProductName", "GameStats Agent"),
-            StringStruct("ProductVersion", "1.1.0"),
+            StringStruct("ProductVersion", "1.2.0"),
           ],
         )
       ]

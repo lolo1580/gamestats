@@ -17,6 +17,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,13 @@ import requests
 
 LOGGER = logging.getLogger("gamestats-agent")
 APP_NAME = "GameStats"
-AGENT_VERSION = "1.1.0"
+AGENT_VERSION = "1.2.0"
+
+# Contrat backend : au plus 64 jeux par heartbeat.
+MAX_GAMES_PER_HEARTBEAT = 64
+# Plafond du backoff lorsque le backend est injoignable.
+MAX_RETRY_SECONDS = 300
+USER_AGENT = f"GameStats-Agent/{AGENT_VERSION}"
 
 
 def user_data_dir() -> Path:
@@ -192,6 +199,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         version=f"GameStats Agent {AGENT_VERSION}",
     )
     parser.add_argument(
+        "--list-processes",
+        action="store_true",
+        help=(
+            "Affiche les exécutables en cours d'exécution, en signalant ceux "
+            "déjà surveillés (*), puis quitte."
+        ),
+    )
+    parser.add_argument(
         "--once",
         action="store_true",
         help="Envoie un seul heartbeat puis quitte (test de configuration).",
@@ -206,7 +221,14 @@ def setup_logging(level: str, log_file: Path | None) -> None:
     if log_file is not None:
         try:
             log_file.parent.mkdir(parents=True, exist_ok=True)
-            handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
+            handlers.append(
+                RotatingFileHandler(
+                    log_file,
+                    maxBytes=1_000_000,
+                    backupCount=3,
+                    encoding="utf-8",
+                )
+            )
         except OSError:
             pass
     if not handlers:
@@ -300,10 +322,16 @@ def load_game_mappings(path: Path) -> list[dict[str, Any]]:
     mappings: list[dict[str, Any]] = []
     for entry in entries:
         if not isinstance(entry, dict):
+            LOGGER.warning("Entrée ignorée dans %s : objet JSON attendu.", path)
             continue
         name = str(entry.get("name", "")).strip()
         processes = entry.get("processes") or entry.get("match") or []
         if not name or not isinstance(processes, list):
+            LOGGER.warning(
+                "Entrée ignorée dans %s : « name » et une liste « processes » "
+                "sont obligatoires.",
+                path,
+            )
             continue
 
         normalized = sorted(
@@ -314,12 +342,23 @@ def load_game_mappings(path: Path) -> list[dict[str, Any]]:
             }
         )
         if not normalized:
+            LOGGER.warning(
+                "Entrée ignorée dans %s : aucun processus valide pour « %s ».",
+                path,
+                name,
+            )
             continue
 
         mapping: dict[str, Any] = {"name": name, "processes": normalized}
         steam_app_id = entry.get("steam_app_id")
+        if isinstance(steam_app_id, str) and steam_app_id.strip().isdigit():
+            steam_app_id = int(steam_app_id.strip())
         if isinstance(steam_app_id, int) and steam_app_id > 0:
             mapping["steam_app_id"] = steam_app_id
+        elif steam_app_id not in (None, ""):
+            LOGGER.warning(
+                "steam_app_id ignoré pour « %s » : entier positif attendu.", name
+            )
         mappings.append(mapping)
 
     if not mappings:
@@ -362,6 +401,34 @@ def detect_games(
     return detected
 
 
+def format_process_list(
+    mappings: list[dict[str, Any]], running: set[str]
+) -> str:
+    known = {process for mapping in mappings for process in mapping["processes"]}
+    lines = [
+        f"{'*' if name in known else ' '} {name}" for name in sorted(running)
+    ]
+    header = (
+        f"GameStats Agent {AGENT_VERSION} — {len(running)} processus en cours, "
+        f"{len(known & running)} surveillé(s) (*) :"
+    )
+    return "\n".join([header, *lines])
+
+
+def print_process_list(config: Path) -> int:
+    try:
+        mappings = load_game_mappings(config)
+    except ValueError as exc:
+        LOGGER.warning("%s", exc)
+        mappings = []
+    text = format_process_list(mappings, running_process_names())
+    if getattr(sys, "frozen", False):
+        notify(text[:6000])
+    else:
+        print(text)
+    return 0
+
+
 def send_heartbeat(
     http: requests.Session,
     endpoint: str,
@@ -373,7 +440,7 @@ def send_heartbeat(
         json=payload,
         headers={
             "X-Agent-Key": api_key,
-            "User-Agent": "GameStats-Agent/1.0",
+            "User-Agent": USER_AGENT,
         },
         timeout=10,
     )
@@ -395,6 +462,9 @@ def main() -> int:
         notify(f"Configuration invalide : {exc}", error=True)
         return 2
     setup_logging(args.log_level, args.log_file)
+
+    if args.list_processes:
+        return print_process_list(args.config)
 
     if not args.key:
         message = (
@@ -424,27 +494,71 @@ def main() -> int:
     hostname = socket.gethostname()
     http = requests.Session()
 
+    LOGGER.info("GameStats Agent %s démarré.", AGENT_VERSION)
     LOGGER.info("Agent %s (%s) → %s", agent_id, hostname, endpoint)
-    LOGGER.info("%s jeu(x) surveillé(s), heartbeat toutes les %ss.", len(mappings), interval)
+    LOGGER.info(
+        "%s jeu(x) surveillé(s), heartbeat toutes les %ss.", len(mappings), interval
+    )
 
     last_signature: tuple[str, ...] | None = None
+    failures = 0
     exit_code = 0
 
     try:
         while True:
             started = time.monotonic()
-            running = running_process_names()
-            detected = detect_games(mappings, running)
-
-            payload = {
-                "agent_id": agent_id,
-                "hostname": hostname,
-                "games": detected,
-                "captured_at": datetime.now(timezone.utc).isoformat(),
-            }
-
+            delay = interval
             try:
+                running = running_process_names()
+                detected = detect_games(mappings, running)
+                if len(detected) > MAX_GAMES_PER_HEARTBEAT:
+                    LOGGER.warning(
+                        "%s jeux détectés : seuls les %s premiers sont envoyés.",
+                        len(detected),
+                        MAX_GAMES_PER_HEARTBEAT,
+                    )
+                    detected = detected[:MAX_GAMES_PER_HEARTBEAT]
+
+                payload = {
+                    "agent_id": agent_id,
+                    "hostname": hostname,
+                    "games": detected,
+                    "captured_at": datetime.now(timezone.utc).isoformat(),
+                }
                 response = send_heartbeat(http, endpoint, args.key, payload)
+            except requests.RequestException as exc:
+                failures += 1
+                delay = min(
+                    interval * (2 ** min(failures - 1, 4)), MAX_RETRY_SECONDS
+                )
+                LOGGER.warning(
+                    "Heartbeat impossible (%s). Nouvel essai dans %ss.",
+                    exc,
+                    delay,
+                )
+                if args.once:
+                    notify(
+                        "Connexion impossible au serveur GameStats.\n"
+                        f"{exc}",
+                        error=True,
+                    )
+                    exit_code = 1
+            except Exception as exc:  # garde-fou : l'agent ne doit pas mourir
+                failures += 1
+                delay = min(
+                    interval * (2 ** min(failures - 1, 4)), MAX_RETRY_SECONDS
+                )
+                LOGGER.exception(
+                    "Erreur inattendue pendant le cycle (%s). "
+                    "Nouvel essai dans %ss.",
+                    exc,
+                    delay,
+                )
+                if args.once:
+                    notify(f"Erreur inattendue : {exc}", error=True)
+                    exit_code = 1
+            else:
+                failures = 0
                 signature = tuple(sorted(game["name"] for game in detected))
                 if signature != last_signature:
                     if detected:
@@ -465,23 +579,12 @@ def main() -> int:
                         f"{len(detected)} jeu(x) détecté(s), "
                         f"{active} session(s) active(s)."
                     )
-            except requests.RequestException as exc:
-                LOGGER.warning(
-                    "Heartbeat impossible (%s). Nouvel essai dans %ss.", exc, interval
-                )
-                if args.once:
-                    notify(
-                        "Connexion impossible au serveur GameStats.\n"
-                        f"{exc}",
-                        error=True,
-                    )
-                    exit_code = 1
 
             if args.once:
                 break
 
             elapsed = time.monotonic() - started
-            time.sleep(max(1.0, interval - elapsed))
+            time.sleep(max(1.0, delay - elapsed))
     except KeyboardInterrupt:
         LOGGER.info("Arrêt de l'agent.")
     finally:

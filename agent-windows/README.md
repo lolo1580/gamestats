@@ -61,13 +61,39 @@ exécutables détectés par le gestionnaire de tâches. Exemple :
 
 Relancez l’agent après modification de la liste.
 
+## Diagnostic
+
+Pour connaître le nom exact d’un exécutable, lancez l’agent avec
+`--list-processes` : il affiche les processus en cours et marque d’un `*` ceux
+déjà surveillés.
+
+```powershell
+py tracker.py --list-processes
+```
+
+Avec l’exécutable installé, le résultat s’affiche dans une boîte de dialogue :
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\GameStats Agent\GameStatsAgent.exe" --list-processes
+```
+
+Si le backend est injoignable, l’agent ne s’arrête pas : il réessaie avec un
+délai progressif (30 s, 60 s, 120 s… jusqu’à 5 minutes) et reprend le rythme
+normal dès qu’une réponse revient. Une erreur inattendue pendant un cycle est
+journalisée et l’agent continue.
+
+Les entrées invalides de `games.json` (nom manquant, liste de processus vide,
+`steam_app_id` non numérique) sont ignorées et signalées dans `agent.log`. Ce
+fichier est limité à 1 Mo et conservé en trois archives (`agent.log.1` à
+`agent.log.3`).
+
 ## Construire l’installateur
 
 ### Sur Windows
 
 Prérequis :
 
-- Python 3.11 ou 3.12 ;
+- Python 3.11 ou plus récent ;
 - [Inno Setup 6](https://jrsoftware.org/isinfo.php) pour générer l’installateur.
 
 Depuis `agent-windows/` :

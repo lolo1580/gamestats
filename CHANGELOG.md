@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Local agent download from the GameStats server: files placed in `downloads/`
   are served by the backend and exposed in Settings → General. Preview Docker
   images automatically bundle the latest Windows agent artifact.
+- `--list-processes` diagnostic in the Windows agent, which lists running
+  executables and flags the ones already watched, to help fill `games.json`.
 
 ### Changed
 
@@ -80,6 +82,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the backend.
 - Settings page now includes Backups and Documentation tabs.
 - README and changelog are maintained in English.
+- The Windows agent now keeps running after an unexpected error in its cycle,
+  retries an unreachable backend with capped exponential backoff, rotates its
+  log file, reports ignored `games.json` entries, and sends its real version in
+  the `User-Agent` header.
 
 ### Security
 
