@@ -30,6 +30,11 @@ SETTING_XBOX_LAST_SYNC = "xbox_last_sync_at"
 SETTING_XBOX_DEVICE_CODE = "xbox_device_code"
 SETTING_XBOX_DEVICE_EXPIRES = "xbox_device_expires_at"
 SETTING_XBOX_DEVICE_INTERVAL = "xbox_device_interval"
+SETTING_UBISOFT_REMEMBER_ME_TICKET = "ubisoft_remember_me_ticket"
+SETTING_UBISOFT_PROFILE_ID = "ubisoft_profile_id"
+SETTING_UBISOFT_USER_ID = "ubisoft_user_id"
+SETTING_UBISOFT_NAME = "ubisoft_name"
+SETTING_UBISOFT_LAST_SYNC = "ubisoft_last_sync_at"
 
 SECRET_SETTINGS = {
     SETTING_AGENT_API_KEY,
@@ -39,6 +44,7 @@ SECRET_SETTINGS = {
     SETTING_INFLUX_TOKEN,
     SETTING_XBOX_REFRESH_TOKEN,
     SETTING_XBOX_DEVICE_CODE,
+    SETTING_UBISOFT_REMEMBER_ME_TICKET,
 }
 
 SETTING_DEFAULTS = {
@@ -64,6 +70,11 @@ SETTING_DEFAULTS = {
     SETTING_XBOX_DEVICE_CODE: lambda: "",
     SETTING_XBOX_DEVICE_EXPIRES: lambda: "",
     SETTING_XBOX_DEVICE_INTERVAL: lambda: "5",
+    SETTING_UBISOFT_REMEMBER_ME_TICKET: lambda: "",
+    SETTING_UBISOFT_PROFILE_ID: lambda: "",
+    SETTING_UBISOFT_USER_ID: lambda: "",
+    SETTING_UBISOFT_NAME: lambda: "",
+    SETTING_UBISOFT_LAST_SYNC: lambda: "",
 }
 
 
@@ -86,6 +97,10 @@ class IntegrationSettings:
     xbox_gamertag: str
     xbox_xuid: str
     xbox_gamerscore: int
+    ubisoft_remember_me_ticket: str
+    ubisoft_profile_id: str
+    ubisoft_user_id: str
+    ubisoft_name: str
 
     @property
     def steam_configured(self) -> bool:
@@ -107,6 +122,14 @@ class IntegrationSettings:
     @property
     def xbox_connected(self) -> bool:
         return bool(self.xbox_client_id and self.xbox_refresh_token and self.xbox_xuid)
+
+    @property
+    def ubisoft_connected(self) -> bool:
+        return bool(
+            self.ubisoft_remember_me_ticket
+            and self.ubisoft_profile_id
+            and self.ubisoft_user_id
+        )
 
 
 def ensure_default_settings(db: Session) -> None:
@@ -160,6 +183,12 @@ def get_integration_settings(db: Session) -> IntegrationSettings:
         xbox_gamertag=get_setting(db, SETTING_XBOX_GAMERTAG, ""),
         xbox_xuid=get_setting(db, SETTING_XBOX_XUID, ""),
         xbox_gamerscore=_int_setting(db, SETTING_XBOX_GAMERSCORE),
+        ubisoft_remember_me_ticket=get_setting(
+            db, SETTING_UBISOFT_REMEMBER_ME_TICKET, ""
+        ),
+        ubisoft_profile_id=get_setting(db, SETTING_UBISOFT_PROFILE_ID, ""),
+        ubisoft_user_id=get_setting(db, SETTING_UBISOFT_USER_ID, ""),
+        ubisoft_name=get_setting(db, SETTING_UBISOFT_NAME, ""),
     )
 
 

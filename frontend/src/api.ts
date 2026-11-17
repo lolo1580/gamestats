@@ -11,6 +11,7 @@ import type {
   SettingsUpdatePayload,
   Summary,
   TopGame,
+  UbisoftResult,
   XboxDeviceCode,
   XboxPollResult,
   XboxSyncResult,
@@ -185,6 +186,12 @@ export const api = {
   pollXboxDevice: () => post<XboxPollResult>('/xbox/device-code/poll'),
   syncXbox: () => post<XboxSyncResult>('/xbox/sync'),
   disconnectXbox: () => post<{ ok: boolean }>('/xbox/disconnect'),
+  connectUbisoft: (rememberMeTicket: string) =>
+    post<UbisoftResult>('/ubisoft/connect', {
+      remember_me_ticket: rememberMeTicket,
+    }),
+  syncUbisoft: () => post<UbisoftResult>('/ubisoft/sync'),
+  disconnectUbisoft: () => post<{ ok: boolean }>('/ubisoft/disconnect'),
 
   downloadBackup: (format: 'json' | 'sqlite') =>
     download(`/admin/backup/export/${format}`),

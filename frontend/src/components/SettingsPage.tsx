@@ -87,6 +87,8 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
     interval: number
   } | null>(null)
   const [xboxBusy, setXboxBusy] = useState(false)
+  const [ubisoftTicket, setUbisoftTicket] = useState('')
+  const [ubisoftBusy, setUbisoftBusy] = useState(false)
 
   const [newUsername, setNewUsername] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -365,6 +367,64 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       reportError(xboxError)
     } finally {
       setXboxBusy(false)
+    }
+  }
+
+  const connectUbisoft = async () => {
+    if (!ubisoftTicket.trim()) {
+      setError(t('settings.integrations.ubisoftTicketHint'))
+      return
+    }
+    setUbisoftBusy(true)
+    setError(null)
+    try {
+      const result = await api.connectUbisoft(ubisoftTicket.trim())
+      setUbisoftTicket('')
+      setSettings(await api.settings())
+      flash(
+        result.message ??
+          t('settings.integrations.ubisoftSynced', {
+            games: result.games_synced ?? 0,
+          }),
+      )
+    } catch (ubisoftError) {
+      reportError(ubisoftError)
+    } finally {
+      setUbisoftBusy(false)
+    }
+  }
+
+  const syncUbisoftNow = async () => {
+    setUbisoftBusy(true)
+    setError(null)
+    try {
+      const result = await api.syncUbisoft()
+      setSettings(await api.settings())
+      flash(
+        result.message ??
+          t('settings.integrations.ubisoftSynced', {
+            games: result.games_synced ?? 0,
+          }),
+      )
+    } catch (ubisoftError) {
+      reportError(ubisoftError)
+    } finally {
+      setUbisoftBusy(false)
+    }
+  }
+
+  const disconnectUbisoft = async () => {
+    if (!window.confirm(t('settings.integrations.ubisoftDisconnectConfirm'))) return
+    setUbisoftBusy(true)
+    setError(null)
+    try {
+      await api.disconnectUbisoft()
+      setSettings(await api.settings())
+      flash(t('settings.integrations.ubisoftNotConnected'))
+    } catch (ubisoftError) {
+      reportError(ubisoftError)
+    } finally {
+      setUbisoftBusy(false)
     }
   }
 
@@ -1028,6 +1088,100 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               )}
             </div>
 
+            <div className="settings-group">
+              <div className="settings-group__head">
+                <h3>{t('settings.integrations.ubisoft')}</h3>
+                <span
+                  className={`config-status${
+                    settings.ubisoft_connected ? ' is-on' : ' is-off'
+                  }`}
+                >
+                  {settings.ubisoft_connected
+                    ? t('settings.integrations.ubisoftConnected')
+                    : t('settings.integrations.ubisoftNotConnected')}
+                </span>
+              </div>
+              <p className="settings-hint">
+                {t('settings.integrations.ubisoftSubtitle')}
+              </p>
+
+              <label className="field">
+                <span>{t('settings.integrations.ubisoftTicket')}</span>
+                <input
+                  className="input"
+                  type="password"
+                  value={ubisoftTicket}
+                  onChange={(event) => setUbisoftTicket(event.target.value)}
+                  placeholder={
+                    settings.ubisoft_remember_me_ticket_set
+                      ? settings.ubisoft_remember_me_ticket_hint
+                      : t('settings.integrations.ubisoftTicket')
+                  }
+                  autoComplete="off"
+                />
+                <small>{t('settings.integrations.ubisoftTicketHint')}</small>
+              </label>
+
+              {settings.ubisoft_connected && (
+                <div className="xbox-metrics">
+                  {settings.ubisoft_name && (
+                    <span>
+                      Ubisoft
+                      <strong>{settings.ubisoft_name}</strong>
+                    </span>
+                  )}
+                  <span>
+                    {t('settings.integrations.ubisoftLastSync')}
+                    <strong>
+                      {settings.ubisoft_last_sync_at
+                        ? formatRelative(settings.ubisoft_last_sync_at, lang)
+                        : t('common.never')}
+                    </strong>
+                  </span>
+                </div>
+              )}
+
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={connectUbisoft}
+                  disabled={ubisoftBusy || !ubisoftTicket.trim()}
+                >
+                  <Globe2 size={14} strokeWidth={2} />
+                  {t('settings.integrations.ubisoftConnect')}
+                </button>
+                {settings.ubisoft_connected && (
+                  <>
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={syncUbisoftNow}
+                      disabled={ubisoftBusy}
+                    >
+                      <RefreshCw
+                        size={14}
+                        strokeWidth={2}
+                        className={ubisoftBusy ? 'is-spinning' : undefined}
+                      />
+                      {t('settings.integrations.ubisoftSync')}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--danger"
+                      onClick={disconnectUbisoft}
+                      disabled={ubisoftBusy}
+                    >
+                      {t('settings.integrations.ubisoftDisconnect')}
+                    </button>
+                  </>
+                )}
+              </div>
+              <p className="settings-hint">
+                {t('settings.integrations.ubisoftNoPlaytime')}
+              </p>
+            </div>
+
             <button type="submit" className="button button--primary" disabled={saving}>
               <Save size={15} strokeWidth={2} />
               {t('settings.integrations.save')}
@@ -1485,6 +1639,20 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               <code>Connect from Settings → Integrations → Xbox</code>
             </div>
             <p className="settings-hint">{t('settings.docs.xboxHint')}</p>
+          </section>
+
+          <section className="panel settings-panel">
+            <header className="card-head">
+              <div>
+                <h2>{t('settings.docs.ubisoftTitle')}</h2>
+                <p>{t('settings.docs.ubisoftSubtitle')}</p>
+              </div>
+            </header>
+            <div className="docs-code">
+              <code>rememberMeTicket → Settings → Integrations → Ubisoft</code>
+              <code>GET /v1/profiles/gamesplayed?profileIds=...</code>
+            </div>
+            <p className="settings-hint">{t('settings.docs.ubisoftHint')}</p>
           </section>
         </div>
       )}

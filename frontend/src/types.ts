@@ -50,6 +50,11 @@ export interface AppSettings {
   xbox_gamerscore: number
   xbox_connected: boolean
   xbox_last_sync_at: string | null
+  ubisoft_remember_me_ticket_hint: string
+  ubisoft_remember_me_ticket_set: boolean
+  ubisoft_name: string
+  ubisoft_connected: boolean
+  ubisoft_last_sync_at: string | null
 }
 
 export interface SettingsUpdatePayload {
@@ -92,6 +97,14 @@ export interface XboxSyncResult {
   last_sync_at: string | null
 }
 
+export interface UbisoftResult {
+  connected: boolean
+  name: string | null
+  games_synced: number | null
+  last_sync_at: string | null
+  message: string | null
+}
+
 export interface InfluxExportResult {
   skipped: boolean
   reason: string | null
@@ -117,6 +130,10 @@ export interface Game {
   xbox_gamerscore: number
   xbox_gamerscore_total: number
   xbox_last_played_at: string | null
+  ubisoft_space_id: string | null
+  ubisoft_sessions_count: number
+  ubisoft_first_played_at: string | null
+  ubisoft_last_played_at: string | null
 }
 
 export interface TopGame extends Game {

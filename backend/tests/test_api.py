@@ -4,11 +4,14 @@ from datetime import timedelta
 import httpx
 
 import influx as influx_module
+from collectors import ubisoft as ubisoft_module
 from collectors import xbox as xbox_module
+from collectors.ubisoft import parse_games_played
 from collectors.xbox import parse_titles
 from database import SessionLocal
 from models import Game, GameSession, utcnow
 from settings_service import (
+    SETTING_UBISOFT_REMEMBER_ME_TICKET,
     SETTING_XBOX_CLIENT_ID,
     SETTING_XBOX_REFRESH_TOKEN,
     update_settings,
@@ -518,3 +521,99 @@ def test_xbox_sync_maps_titles_to_library(client, monkeypatch):
     assert settings["xbox_connected"] is True
     assert settings["xbox_gamertag"] == "Player One"
     assert settings["xbox_gamerscore"] == 1234
+
+def test_ubisoft_parse_games_played():
+    entries = parse_games_played(
+        {
+            "gamesPlayed": [
+                {
+                    "spaceId": "abc-space",
+                    "spacePlatformType": "uplay",
+                    "firstPlayed": {"createdAt": "2025-01-01T10:00:00Z"},
+                    "lastPlayed": {"updatedAt": "2026-11-16T21:15:00Z"},
+                    "sessionsCount": 12,
+                    "applications": [
+                        {
+                            "applicationId": "app-1",
+                            "sessionsCount": 12,
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+    assert len(entries) == 1
+    assert entries[0]["space_id"] == "abc-space"
+    assert entries[0]["sessions_count"] == 12
+    assert entries[0]["first_played_at"] is not None
+    assert entries[0]["last_played_at"] is not None
+
+
+def test_ubisoft_endpoints_without_connection(client):
+    sync = client.post("/api/ubisoft/sync")
+    assert sync.status_code == 200
+    assert sync.json()["connected"] is False
+
+    disconnect = client.post("/api/ubisoft/disconnect")
+    assert disconnect.status_code == 200
+
+
+def test_ubisoft_sync_maps_library(client, monkeypatch):
+    with SessionLocal() as db:
+        update_settings(
+            db, {SETTING_UBISOFT_REMEMBER_ME_TICKET: "remember-me-ticket"}
+        )
+
+    class FakeUbisoftClient:
+        def __init__(self, _ticket):
+            self.ticket = _ticket
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def login(self):
+            return {
+                "ticket": "session-ticket",
+                "rememberMeTicket": "new-remember-ticket",
+                "profileId": "profile-1",
+                "userId": "user-1",
+                "nameOnPlatform": "Ubisoft Player",
+            }
+
+        def games_played(self, _session):
+            return [
+                {
+                    "space_id": "space-1",
+                    "sessions_count": 7,
+                    "first_played_at": utcnow() - timedelta(days=30),
+                    "last_played_at": utcnow() - timedelta(days=1),
+                    "application_ids": ["app-1"],
+                }
+            ]
+
+        def space_name(self, _space_id, _session):
+            return "Assassin's Creed Mirage"
+
+    monkeypatch.setattr(ubisoft_module, "UbisoftClient", FakeUbisoftClient)
+
+    with SessionLocal() as db:
+        result = ubisoft_module.sync_ubisoft_library(db)
+
+    assert result["connected"] is True
+    assert result["games_synced"] == 1
+    assert result["name"] == "Ubisoft Player"
+
+    games = client.get("/api/games").json()
+    assert len(games) == 1
+    game = games[0]
+    assert game["name"] == "Assassin's Creed Mirage"
+    assert game["ubisoft_space_id"] == "space-1"
+    assert game["ubisoft_sessions_count"] == 7
+    assert game["ubisoft_last_played_at"] is not None
+
+    settings = client.get("/api/settings").json()
+    assert settings["ubisoft_connected"] is True
+    assert settings["ubisoft_name"] == "Ubisoft Player"

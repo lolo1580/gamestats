@@ -3159,3 +3159,20 @@ code {
 .game-card__playtime + .game-card__gamerscore {
   display: none;
 }
+
+.game-card__ubisoft {
+  display: inline-flex;
+  margin-top: 6px;
+  padding: 3px 6px;
+  color: #d7e8ff;
+  background: var(--accent-soft);
+  border: 1px solid rgba(76, 141, 255, 0.16);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 8px;
+}
+
+.game-card__ubisoft + .achievements,
+.game-card__ubisoft + .game-card__empty {
+  margin-top: 7px;
+}

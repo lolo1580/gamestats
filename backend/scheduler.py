@@ -8,6 +8,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from collectors.igdb import enrich_games
 from collectors.steam import sync_steam_library
+from collectors.ubisoft import sync_ubisoft_library
 from collectors.xbox import sync_xbox_library
 from config import get_settings
 from database import SessionLocal
@@ -76,6 +77,16 @@ def _xbox_job() -> None:
         logger.exception("Échec de la synchronisation Xbox.")
 
 
+def _ubisoft_job() -> None:
+    try:
+        with SessionLocal() as db:
+            result = sync_ubisoft_library(db)
+            if result.get("skipped"):
+                logger.debug("Sync Ubisoft ignorée : %s", result.get("reason"))
+    except Exception:
+        logger.exception("Échec de la synchronisation Ubisoft.")
+
+
 def start_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is not None:
@@ -122,15 +133,23 @@ def start_scheduler() -> BackgroundScheduler:
         name="Synchronisation Xbox",
         next_run_time=utcnow() + timedelta(seconds=60),
     )
+    scheduler.add_job(
+        _ubisoft_job,
+        IntervalTrigger(minutes=max(15, settings.ubisoft_sync_minutes)),
+        id="sync-ubisoft",
+        name="Synchronisation Ubisoft",
+        next_run_time=utcnow() + timedelta(seconds=75),
+    )
 
     scheduler.start()
     _scheduler = scheduler
     logger.info(
-        "Planificateur démarré (Steam: %s min, IGDB: %s min, InfluxDB: %s min, Xbox: %s min, configuration via /api/settings).",
+        "Planificateur démarré (Steam: %s min, IGDB: %s min, InfluxDB: %s min, Xbox: %s min, Ubisoft: %s min, configuration via /api/settings).",
         max(5, settings.steam_sync_minutes),
         max(15, settings.igdb_sync_minutes),
         max(5, settings.influx_export_minutes),
         max(10, settings.xbox_sync_minutes),
+        max(15, settings.ubisoft_sync_minutes),
     )
     return scheduler
 

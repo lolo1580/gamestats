@@ -88,6 +88,11 @@ class SettingsOut(BaseModel):
     xbox_gamerscore: int
     xbox_connected: bool
     xbox_last_sync_at: str | None
+    ubisoft_remember_me_ticket_hint: str
+    ubisoft_remember_me_ticket_set: bool
+    ubisoft_name: str
+    ubisoft_connected: bool
+    ubisoft_last_sync_at: str | None
 
 
 class SettingsUpdate(BaseModel):
@@ -146,6 +151,18 @@ class XboxSyncOut(BaseModel):
     last_sync_at: str | None = None
 
 
+class UbisoftConnectIn(BaseModel):
+    remember_me_ticket: str = Field(min_length=10, max_length=4096)
+
+
+class UbisoftOut(BaseModel):
+    connected: bool
+    name: str | None = None
+    games_synced: int | None = None
+    last_sync_at: str | None = None
+    message: str | None = None
+
+
 class HeartbeatGameIn(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     process: str | None = Field(default=None, max_length=255)
@@ -189,6 +206,10 @@ class GameOut(BaseModel):
     xbox_gamerscore: int
     xbox_gamerscore_total: int
     xbox_last_played_at: datetime | None
+    ubisoft_space_id: str | None
+    ubisoft_sessions_count: int
+    ubisoft_first_played_at: datetime | None
+    ubisoft_last_played_at: datetime | None
 
 
 class TopGameOut(GameOut):

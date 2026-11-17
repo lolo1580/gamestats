@@ -37,11 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Xbox integration via passwordless Azure device-code flow, with achievements,
   gamerscore, recent games, cover images, and a 30-minute sync.
 - Xbox-specific game fields and library badges, plus a disconnect action.
+- Ubisoft Connect integration with a manual remember-me ticket, games played,
+  first/last dates, session counts, and library badges.
 
 ### Changed
 
-- Settings integrations now cover Steam, IGDB, Homepage, InfluxDB, and Xbox.
-- The SQLite schema now migrates new Xbox columns on existing game tables.
+- Settings integrations now cover Steam, IGDB, Homepage, InfluxDB, Xbox, and
+  Ubisoft.
+- The SQLite schema now migrates new Xbox and Ubisoft columns on existing game
+  tables.
 - Dashboard, library, sessions, stats, agents, user, and settings endpoints now
   require an authenticated session.
 - Admin sync/enrichment endpoints now require an administrator session instead

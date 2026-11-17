@@ -22,6 +22,7 @@ from routes_backup import router as backup_router
 from routes_homepage import router as homepage_router
 from routes_influx import router as influx_router
 from routes_settings import router as settings_router
+from routes_ubisoft import router as ubisoft_router
 from routes_users import router as users_router
 from routes_xbox import router as xbox_router
 from scheduler import start_scheduler, stop_scheduler
@@ -85,7 +86,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="GameStats API",
-    version="1.3.0",
+    version="1.4.0",
     description="Suivi de sessions de jeu (agent PC + Steam) et statistiques.",
     lifespan=lifespan,
     docs_url=None,
@@ -108,6 +109,7 @@ app.include_router(backup_router)
 app.include_router(homepage_router)
 app.include_router(influx_router)
 app.include_router(xbox_router)
+app.include_router(ubisoft_router)
 
 
 @app.get("/")

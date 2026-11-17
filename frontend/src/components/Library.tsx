@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Clock3, LibraryBig, Search, Trophy } from 'lucide-react'
 import type { Game } from '../types'
-import { formatPlaytime } from '../format'
+import { formatLastPlayed, formatPlaytime } from '../format'
 import { useI18n } from '../i18n'
 import { Cover } from './Cover'
 
@@ -44,6 +44,7 @@ export function Library({ games, loading }: LibraryProps) {
       Math.max(
         new Date(game.last_played_at ?? 0).getTime(),
         new Date(game.xbox_last_played_at ?? 0).getTime(),
+        new Date(game.ubisoft_last_played_at ?? 0).getTime(),
       )
 
     return [...filtered].sort((left, right) => {
@@ -182,6 +183,17 @@ export function Library({ games, loading }: LibraryProps) {
                   <p className="game-card__genres">
                     {game.genres.slice(0, 2).join(' · ') || t('library.unknownGenre')}
                   </p>
+
+                  {game.ubisoft_space_id && (
+                    <span className="game-card__ubisoft">
+                      {t('library.ubisoftSessions', {
+                        count: game.ubisoft_sessions_count,
+                      })}
+                      {game.ubisoft_last_played_at
+                        ? ` · ${formatLastPlayed(game.ubisoft_last_played_at, lang)}`
+                        : ''}
+                    </span>
+                  )}
 
                   {achievementsTotal > 0 ? (
                     <div className="achievements">

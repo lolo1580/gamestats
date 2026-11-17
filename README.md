@@ -8,7 +8,8 @@ covers and genres from IGDB.
 The interface ships in **French and English**, with **dark and light themes**.
 
 Supported sources: **PC agent**, **Steam**, **Xbox** (achievements, gamerscore,
-and recent games), and **IGDB** metadata.
+and recent games), **Ubisoft Connect** (games, dates, and session counts), and
+**IGDB** metadata.
 
 ## Features
 
@@ -22,6 +23,9 @@ and recent games), and **IGDB** metadata.
   Xbox Web API, with a passwordless Azure device-code connection. Xbox does not
   expose reliable per-game playtime; PC playtime continues to come from the
   agent.
+- **Ubisoft Connect sync** — games played, first/last played dates, and session
+  counts through the unofficial Ubisoft API. No Ubisoft password is stored; a
+  manual remember-me ticket is used. Playtime and achievements are not provided.
 - **Double-count protection** — Steam playtime deltas already covered by an
   agent session are ignored.
 - **IGDB enrichment** — HD covers and genres for games that do not have them yet.
@@ -35,7 +39,8 @@ and recent games), and **IGDB** metadata.
 - **Accounts and roles** — first-run admin setup, login/logout, local sessions,
   user management, and `admin` / `viewer` roles.
 - **Backend settings** — manage the agent key, timezone, Steam, IGDB, Homepage,
-  InfluxDB, and Xbox integration from the UI. Secrets are masked in responses.
+  InfluxDB, Xbox, and Ubisoft integration from the UI. Secrets are masked in
+  responses.
 - **Backups** — export a readable JSON snapshot or a full SQLite database, then
   restore either format from the settings page.
 - **Homepage widget API** — a token-protected JSON endpoint ready for the
@@ -68,8 +73,8 @@ frontend (React/nginx) ◄──────── GET /api/* ──────
   heartbeat.
 - **Scheduler** closes stale sessions every minute, syncs Steam every 15 minutes,
   enriches IGDB data every 60 minutes, exports InfluxDB points every 15 minutes,
-  and syncs Xbox every 30 minutes. Run a single uvicorn worker so the scheduler
-  is not duplicated.
+  syncs Xbox every 30 minutes, and syncs Ubisoft every 60 minutes. Run a single
+  uvicorn worker so the scheduler is not duplicated.
 - **Frontend** is a React/Vite SPA served by nginx. `/api` is proxied to the
   backend.
 
@@ -120,6 +125,7 @@ Copy `.env.example` to `.env` and adjust the values:
 | `IGDB_SYNC_MINUTES`     | `60`                 | IGDB enrichment interval.                                          |
 | `INFLUX_EXPORT_MINUTES` | `15`                 | InfluxDB export interval.                                          |
 | `XBOX_SYNC_MINUTES`     | `30`                 | Xbox synchronization interval.                                     |
+| `UBISOFT_SYNC_MINUTES`  | `60`                 | Ubisoft synchronization interval.                                  |
 | `SESSION_DAYS`          | `7`                  | Browser session lifetime, in days.                                |
 | `COOKIE_SECURE`         | `false`              | Set to `true` when serving the app over HTTPS.                     |
 | `SCHEDULER_ENABLED`     | `true`               | Set to `false` to disable background jobs.                         |
@@ -184,6 +190,30 @@ Windows agent.
    30 minutes.
 
 The connection can be revoked from the Xbox section of the settings page.
+
+## Ubisoft setup
+
+Ubisoft support uses the **unofficial Ubisoft Connect API**. It imports games
+played, first/last played dates, and session counts. It does **not** import
+playtime or achievements, and Ubisoft may change these endpoints without notice.
+
+GameStats never receives your Ubisoft password. Obtain a `rememberMeTicket` with
+your own login (for example with `curl`), then paste it into
+**Settings → Intégrations → Ubisoft**:
+
+```bash
+curl -s https://public-ubiservices.ubi.com/v3/profiles/sessions \
+  -H "Ubi-AppId: 4391c956-8943-48eb-8859-07b0778f47b9" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(printf 'EMAIL:PASSWORD' | base64)" \
+  -d '{"rememberMe":true}'
+```
+
+Copy the `rememberMeTicket` field from the response. If your account requires
+2FA, complete the Ubisoft 2FA flow first and then request a remember-me session.
+
+The ticket is a sensitive credential. Store/transmit it only over a trusted
+network or HTTPS, and disconnect the account in Settings if it is compromised.
 
 ## Windows agent
 
@@ -284,6 +314,9 @@ not be visible. Check the log file if nothing appears in the dashboard.
 | `POST` | `/api/xbox/device-code/poll` | Poll/complete the Xbox connection (admin)    |
 | `POST` | `/api/xbox/sync`         | Force an Xbox synchronization (admin)            |
 | `POST` | `/api/xbox/disconnect`   | Disconnect the Xbox account (admin)              |
+| `POST` | `/api/ubisoft/connect`   | Connect with a remember-me ticket (admin)        |
+| `POST` | `/api/ubisoft/sync`      | Force a Ubisoft synchronization (admin)          |
+| `POST` | `/api/ubisoft/disconnect`| Disconnect the Ubisoft account (admin)           |
 | `POST` | `/api/admin/sync/steam`   | Force a Steam sync (admin session)               |
 | `POST` | `/api/admin/enrich/igdb`  | Force IGDB enrichment (admin session)            |
 
@@ -365,6 +398,8 @@ gamestats/
 │   ├── influx.py            # InfluxDB line-protocol exporter
 │   ├── routes_xbox.py       # Xbox device-code connection and sync
 │   ├── collectors/xbox.py   # Xbox Live API client and parser
+│   ├── routes_ubisoft.py    # Ubisoft ticket connection and sync
+│   ├── collectors/ubisoft.py # Ubisoft Connect API client and parser
 │   ├── heartbeat.py         # Agent session lifecycle
 │   ├── stats.py             # Summary, daily, heatmap, top games
 │   ├── scheduler.py         # Background jobs
@@ -447,6 +482,8 @@ npm run build
 - Homepage and InfluxDB tokens are stored in SQLite and masked in API responses.
 - The Xbox refresh token is stored in SQLite, masked in API responses, and can
   be revoked by disconnecting the account.
+- The Ubisoft remember-me ticket is stored in SQLite, masked in API responses,
+  and can be revoked by disconnecting the account.
 - The default `AGENT_API_KEY` is `change-me`; change it before exposing the
   service on a network.
 - `.env`, the SQLite database, and local build artifacts are excluded from Git.
@@ -461,6 +498,8 @@ npm run build
   same game create separate sessions.
 - Xbox data does not include reliable playtime; only achievements, gamerscore,
   and recent games are synchronized.
+- Ubisoft support relies on an unofficial API and imports games, dates, and
+  session counts only; playtime and achievements are not available.
 - Restoring a backup replaces users, games, sessions, settings, and invalidates
   current login sessions.
 - InfluxDB exports are incremental and idempotent by point timestamp; changing

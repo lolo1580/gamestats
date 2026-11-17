@@ -24,6 +24,9 @@ from settings_service import (
     SETTING_STEAM_API_KEY,
     SETTING_STEAM_ID,
     SETTING_TIMEZONE,
+    SETTING_UBISOFT_LAST_SYNC,
+    SETTING_UBISOFT_NAME,
+    SETTING_UBISOFT_REMEMBER_ME_TICKET,
     SETTING_XBOX_CLIENT_ID,
     SETTING_XBOX_GAMERSCORE,
     SETTING_XBOX_GAMERTAG,
@@ -71,6 +74,15 @@ def _settings_out(db: Session) -> SettingsOut:
         xbox_gamerscore=integration.xbox_gamerscore,
         xbox_connected=integration.xbox_connected,
         xbox_last_sync_at=get_setting(db, SETTING_XBOX_LAST_SYNC) or None,
+        ubisoft_remember_me_ticket_hint=mask_secret(
+            integration.ubisoft_remember_me_ticket
+        ),
+        ubisoft_remember_me_ticket_set=bool(
+            integration.ubisoft_remember_me_ticket
+        ),
+        ubisoft_name=integration.ubisoft_name,
+        ubisoft_connected=integration.ubisoft_connected,
+        ubisoft_last_sync_at=get_setting(db, SETTING_UBISOFT_LAST_SYNC) or None,
     )
 
 

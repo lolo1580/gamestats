@@ -36,6 +36,10 @@ def game_payload(game: Game) -> dict:
         "xbox_gamerscore": game.xbox_gamerscore or 0,
         "xbox_gamerscore_total": game.xbox_gamerscore_total or 0,
         "xbox_last_played_at": iso_utc(game.xbox_last_played_at),
+        "ubisoft_space_id": game.ubisoft_space_id,
+        "ubisoft_sessions_count": game.ubisoft_sessions_count or 0,
+        "ubisoft_first_played_at": iso_utc(game.ubisoft_first_played_at),
+        "ubisoft_last_played_at": iso_utc(game.ubisoft_last_played_at),
     }
 
 
