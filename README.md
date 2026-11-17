@@ -289,9 +289,25 @@ since 2026, so there is no reliable endpoint to query.
 
 ## Windows agent
 
+### Installer
+
+The recommended option is the Windows installer produced by the build workflow.
+`GameStatsAgentSetup.exe` installs the agent per user, asks for the backend URL
+and agent key, optionally starts it at sign-in, and creates Start Menu shortcuts
+including a connection test. No administrator rights are required.
+
+Build it on Windows with `agent-windows\build.ps1`, or run the
+**Build Windows agent** GitHub Actions workflow and download the artifact. See
+[agent-windows/README.md](agent-windows/README.md) for details.
+
+The installed agent stores its configuration in `%APPDATA%\GameStats\agent.json`,
+the watched games in `%APPDATA%\GameStats\games.json`, and its log in
+`%APPDATA%\GameStats\agent.log`.
+
+### Run from source
+
 Requirements: Python 3.10+ on Windows, on the same network as the backend.
-The agent key is available in **Settings → Général** (it can also be seeded with
-`AGENT_API_KEY` before the first start).
+The agent key is available in **Settings → Général**.
 
 ```powershell
 cd agent-windows
@@ -311,15 +327,20 @@ py tracker.py `
 
 The agent also reads these environment variables:
 
+- `GAMESTATS_SETTINGS` (default `%APPDATA%\GameStats\agent.json`)
 - `GAMESTATS_URL`
 - `GAMESTATS_API_KEY`
 - `GAMESTATS_AGENT_ID`
 - `GAMESTATS_INTERVAL`
+- `GAMESTATS_CONFIG`
 - `GAMESTATS_LOG_FILE`
+- `GAMESTATS_LOG_LEVEL`
 
 ### Add a game
 
-Edit `agent-windows/games.json` and map a display name to its executable(s):
+Edit `agent-windows/games.json` for source runs, or
+`%APPDATA%\GameStats\games.json` for an installed agent, and map a display
+name to its executable(s):
 
 ```json
 {
@@ -339,8 +360,9 @@ Get-Process | Select-Object Name
 
 ### Start with Windows
 
-Create a Task Scheduler task triggered **At log on**. Set the program to
-`pythonw.exe` and use arguments like:
+The installer creates a Startup shortcut by default. For a source run, create a
+Task Scheduler task triggered **At log on**. Set the program to `pythonw.exe` and
+use arguments like:
 
 ```text
 "C:\GameStats\agent-windows\tracker.py" --server http://192.168.1.20:8091 --key "YOUR_KEY" --log-file "C:\GameStats\agent.log"
@@ -494,11 +516,14 @@ gamestats/
 │   │   ├── steam.py
 │   │   └── igdb.py
 │   └── tests/
-├── frontend/
-│   └── src/                 # Auth, dashboard, settings, sessions, library
-└── agent-windows/
-    ├── tracker.py
-    └── games.json
+├── agent-windows/
+│   ├── tracker.py        # Process scanner and heartbeat client
+│   ├── games.json        # Default game/process mappings
+│   ├── GameStatsAgent.spec # PyInstaller build
+│   ├── installer.iss     # Inno Setup installer
+│   └── build.ps1         # Windows build script
+└── frontend/
+    └── src/                 # Auth, dashboard, settings, sessions, library
 ```
 
 ## Development

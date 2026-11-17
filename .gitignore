@@ -26,3 +26,8 @@ frontend/.vite/
 .tmp/
 .DS_Store
 *.log
+
+# Agent Windows (build)
+agent-windows/.venv-build/
+agent-windows/build/
+agent-windows/dist/

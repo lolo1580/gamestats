@@ -24,70 +24,235 @@ import psutil
 import requests
 
 LOGGER = logging.getLogger("gamestats-agent")
-DEFAULT_CONFIG = Path(__file__).resolve().with_name("games.json")
+APP_NAME = "GameStats"
+AGENT_VERSION = "1.1.0"
 
 
-def parse_args() -> argparse.Namespace:
+def user_data_dir() -> Path:
+    if os.name == "nt":
+        base = os.getenv("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+    else:
+        base = os.getenv("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / APP_NAME
+
+
+def default_settings_path() -> Path:
+    return user_data_dir() / "agent.json"
+
+
+def default_games_path() -> Path:
+    if not getattr(sys, "frozen", False):
+        beside = Path(__file__).resolve().with_name("games.json")
+        if beside.exists():
+            return beside
+    return user_data_dir() / "games.json"
+
+
+def load_settings_file(path: Path) -> dict[str, Any]:
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        raise ValueError(f"Configuration illisible ({path}) : {exc}") from exc
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"JSON invalide dans {path} : {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"{path} doit contenir un objet JSON.")
+    return data
+
+
+def resolve_setting_path(value: Any, base: Path) -> Path | None:
+    if value is None or not str(value).strip():
+        return None
+    path = Path(str(value)).expanduser()
+    return path if path.is_absolute() else base / path
+
+
+def env_or_setting(name: str, setting: Any, fallback: Any) -> Any:
+    value = os.getenv(name)
+    if value not in (None, ""):
+        return value
+    if setting not in (None, ""):
+        return setting
+    return fallback
+
+
+def int_setting(value: Any, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    bootstrap = argparse.ArgumentParser(add_help=False)
+    bootstrap.add_argument(
+        "--settings",
+        type=Path,
+        default=Path(
+            os.getenv("GAMESTATS_SETTINGS", str(default_settings_path()))
+        ),
+    )
+    known, _ = bootstrap.parse_known_args(argv)
+    settings_path = known.settings.expanduser()
+    settings = load_settings_file(settings_path)
+    base = settings_path.parent
+
+    env_games = os.getenv("GAMESTATS_CONFIG")
+    if env_games:
+        games_default = Path(env_games).expanduser()
+    else:
+        games_default = resolve_setting_path(settings.get("games_file"), base)
+        if games_default is None:
+            games_default = default_games_path()
+
+    env_log = os.getenv("GAMESTATS_LOG_FILE")
+    if env_log:
+        log_default: Path | None = Path(env_log).expanduser()
+    else:
+        log_default = resolve_setting_path(settings.get("log_file"), base)
+        if log_default is None and (
+            getattr(sys, "frozen", False) or settings_path.exists()
+        ):
+            log_default = user_data_dir() / "agent.log"
+
     parser = argparse.ArgumentParser(
         description="Envoie au backend GameStats les jeux actuellement lancés sur ce PC.",
     )
     parser.add_argument(
+        "--settings",
+        type=Path,
+        default=settings_path,
+        help="Fichier de configuration JSON (défaut : %(default)s).",
+    )
+    parser.add_argument(
         "--server",
-        default=os.getenv("GAMESTATS_URL", "http://localhost:8091"),
-        help="URL du backend, par ex. http://192.168.1.20:8000 (défaut : %(default)s)",
+        default=str(
+            env_or_setting(
+                "GAMESTATS_URL", settings.get("server"), "http://localhost:8091"
+            )
+        ),
+        help="URL du backend, par ex. http://192.168.1.20:8091 (défaut : %(default)s)",
     )
     parser.add_argument(
         "--key",
-        default=os.getenv("GAMESTATS_API_KEY", ""),
+        default=str(
+            env_or_setting("GAMESTATS_API_KEY", settings.get("api_key"), "")
+        ),
         help="Clé partagée AGENT_API_KEY (ou variable GAMESTATS_API_KEY).",
     )
     parser.add_argument(
         "--agent-id",
-        default=os.getenv("GAMESTATS_AGENT_ID"),
+        default=str(
+            env_or_setting(
+                "GAMESTATS_AGENT_ID", settings.get("agent_id"), ""
+            )
+        )
+        or None,
         help="Identifiant stable du PC (généré automatiquement sinon).",
     )
     parser.add_argument(
         "--interval",
         type=int,
-        default=int(os.getenv("GAMESTATS_INTERVAL", "30")),
+        default=int_setting(
+            env_or_setting(
+                "GAMESTATS_INTERVAL", settings.get("interval"), 30
+            ),
+            30,
+        ),
         help="Intervalle entre deux heartbeats, en secondes (défaut : 30).",
     )
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path(os.getenv("GAMESTATS_CONFIG", str(DEFAULT_CONFIG))),
-        help="Fichier JSON des jeux à surveiller (défaut : games.json).",
+        default=games_default,
+        help="Fichier JSON des jeux à surveiller (défaut : %(default)s).",
     )
     parser.add_argument(
         "--log-file",
         type=Path,
-        default=Path(os.environ["GAMESTATS_LOG_FILE"]) if os.getenv("GAMESTATS_LOG_FILE") else None,
-        help="Fichier de log optionnel (utile en arrière-plan avec pythonw).",
+        default=log_default,
+        help="Fichier de log optionnel (utile en arrière-plan).",
     )
     parser.add_argument(
         "--log-level",
-        default=os.getenv("GAMESTATS_LOG_LEVEL", "INFO"),
+        default=str(
+            env_or_setting(
+                "GAMESTATS_LOG_LEVEL", settings.get("log_level"), "INFO"
+            )
+        ),
         help="Niveau de log : DEBUG, INFO, WARNING…",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"GameStats Agent {AGENT_VERSION}",
     )
     parser.add_argument(
         "--once",
         action="store_true",
         help="Envoie un seul heartbeat puis quitte (test de configuration).",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def setup_logging(level: str, log_file: Path | None) -> None:
-    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    handlers: list[logging.Handler] = []
+    if not getattr(sys, "frozen", False) or sys.stderr is not None:
+        handlers.append(logging.StreamHandler())
     if log_file is not None:
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-        handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
+        try:
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+            handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
+        except OSError:
+            pass
+    if not handlers:
+        handlers.append(logging.NullHandler())
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)-7s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=handlers,
     )
+
+
+def notify(message: str, *, error: bool = False) -> None:
+    if getattr(sys, "frozen", False) and os.name == "nt":
+        try:
+            import ctypes
+
+            flags = 0x10 if error else 0x40
+            ctypes.windll.user32.MessageBoxW(
+                None, message, "GameStats Agent", flags
+            )
+            return
+        except Exception:
+            pass
+    stream = sys.stderr if error else sys.stdout
+    if stream is not None:
+        print(message, file=stream)
+
+
+_MUTEX_HANDLE: Any = None
+
+
+def acquire_single_instance() -> bool:
+    global _MUTEX_HANDLE
+    if os.name != "nt":
+        return True
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        _MUTEX_HANDLE = kernel32.CreateMutexW(
+            None, False, "GameStatsAgentMutex"
+        )
+        return kernel32.GetLastError() != 183
+    except Exception:
+        return True
 
 
 def default_agent_id() -> str:
@@ -224,20 +389,33 @@ def send_heartbeat(
 
 
 def main() -> int:
-    args = parse_args()
+    try:
+        args = parse_args()
+    except ValueError as exc:
+        notify(f"Configuration invalide : {exc}", error=True)
+        return 2
     setup_logging(args.log_level, args.log_file)
 
     if not args.key:
-        LOGGER.error(
-            "Clé API manquante. Utilisez --key ou la variable GAMESTATS_API_KEY "
-            "(même valeur que AGENT_API_KEY côté backend)."
+        message = (
+            "Clé API manquante. Utilisez --key, la variable GAMESTATS_API_KEY "
+            "ou le fichier agent.json (même valeur que AGENT_API_KEY côté backend)."
         )
+        LOGGER.error(message)
+        notify(message, error=True)
         return 2
+
+    if not acquire_single_instance():
+        message = "GameStats Agent est déjà en cours d'exécution."
+        LOGGER.info(message)
+        notify(message)
+        return 0
 
     try:
         mappings = load_game_mappings(args.config)
     except ValueError as exc:
         LOGGER.error("%s", exc)
+        notify(str(exc), error=True)
         return 2
 
     interval = max(10, args.interval)
@@ -250,6 +428,7 @@ def main() -> int:
     LOGGER.info("%s jeu(x) surveillé(s), heartbeat toutes les %ss.", len(mappings), interval)
 
     last_signature: tuple[str, ...] | None = None
+    exit_code = 0
 
     try:
         while True:
@@ -279,10 +458,24 @@ def main() -> int:
                 else:
                     active = len(response.get("active_sessions") or [])
                     LOGGER.debug("Heartbeat OK (%s session(s) active(s)).", active)
+                if args.once:
+                    active = len(response.get("active_sessions") or [])
+                    notify(
+                        "Connexion réussie au serveur GameStats.\n"
+                        f"{len(detected)} jeu(x) détecté(s), "
+                        f"{active} session(s) active(s)."
+                    )
             except requests.RequestException as exc:
                 LOGGER.warning(
                     "Heartbeat impossible (%s). Nouvel essai dans %ss.", exc, interval
                 )
+                if args.once:
+                    notify(
+                        "Connexion impossible au serveur GameStats.\n"
+                        f"{exc}",
+                        error=True,
+                    )
+                    exit_code = 1
 
             if args.once:
                 break
@@ -294,7 +487,7 @@ def main() -> int:
     finally:
         http.close()
 
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":

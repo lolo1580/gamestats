@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Metadata enrichment with MobyGames scores and covers, OpenCritic critic scores,
   and HowLongToBeat completion times, configurable from the settings page with
   a manual sync.
+- Windows agent packaging with a PyInstaller executable, an Inno Setup installer
+  that asks for the backend URL and agent key, optional sign-in startup, a
+  connection test, and a GitHub Actions build workflow.
+- JSON settings support for the Windows agent, with per-user configuration,
+  games list, and log files under `%APPDATA%\GameStats`.
 
 ### Changed
 
