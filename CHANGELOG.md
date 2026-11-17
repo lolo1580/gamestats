@@ -28,9 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbers, and labels. Language preference is stored in the browser and on the
   user account.
 - `PATCH /api/auth/me` support for updating the account locale.
+- Token-protected JSON API for the gethomepage.dev `customapi` widget, with
+  token generation, reveal, and rotation.
+- InfluxDB v2 export of session points and summary metrics, scheduled every
+  15 minutes and available on demand, with a stored export watermark.
+- InfluxDB and Homepage settings sections with masked tokens and integration
+  status.
 
 ### Changed
 
+- Settings integrations now cover Steam, IGDB, Homepage, and InfluxDB.
 - Dashboard, library, sessions, stats, agents, user, and settings endpoints now
   require an authenticated session.
 - Admin sync/enrichment endpoints now require an administrator session instead

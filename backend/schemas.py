@@ -71,6 +71,16 @@ class SettingsOut(BaseModel):
     timezone: str
     steam_configured: bool
     igdb_configured: bool
+    homepage_api_token_hint: str
+    homepage_api_token_set: bool
+    influxdb_url: str
+    influxdb_token_hint: str
+    influxdb_token_set: bool
+    influxdb_org: str
+    influxdb_bucket: str
+    influxdb_enabled: bool
+    influxdb_configured: bool
+    influxdb_last_export_at: str | None
 
 
 class SettingsUpdate(BaseModel):
@@ -80,10 +90,28 @@ class SettingsUpdate(BaseModel):
     igdb_client_secret: str | None = None
     agent_api_key: str | None = None
     timezone: str | None = None
+    homepage_api_token: str | None = None
+    influxdb_url: str | None = None
+    influxdb_token: str | None = None
+    influxdb_org: str | None = None
+    influxdb_bucket: str | None = None
+    influxdb_enabled: bool | None = None
 
 
 class AgentKeyOut(BaseModel):
     agent_api_key: str
+
+
+class HomepageTokenOut(BaseModel):
+    homepage_api_token: str
+
+
+class InfluxExportOut(BaseModel):
+    skipped: bool = False
+    reason: str | None = None
+    sessions_exported: int | None = None
+    points_written: int | None = None
+    last_export_at: str | None = None
 
 
 class HeartbeatGameIn(BaseModel):

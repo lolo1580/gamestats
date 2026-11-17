@@ -33,6 +33,16 @@ export interface AppSettings {
   timezone: string
   steam_configured: boolean
   igdb_configured: boolean
+  homepage_api_token_hint: string
+  homepage_api_token_set: boolean
+  influxdb_url: string
+  influxdb_token_hint: string
+  influxdb_token_set: boolean
+  influxdb_org: string
+  influxdb_bucket: string
+  influxdb_enabled: boolean
+  influxdb_configured: boolean
+  influxdb_last_export_at: string | null
 }
 
 export interface SettingsUpdatePayload {
@@ -42,6 +52,20 @@ export interface SettingsUpdatePayload {
   igdb_client_secret?: string
   agent_api_key?: string
   timezone?: string
+  homepage_api_token?: string
+  influxdb_url?: string
+  influxdb_token?: string
+  influxdb_org?: string
+  influxdb_bucket?: string
+  influxdb_enabled?: boolean
+}
+
+export interface InfluxExportResult {
+  skipped: boolean
+  reason: string | null
+  sessions_exported: number | null
+  points_written: number | null
+  last_export_at: string | null
 }
 
 export interface Game {

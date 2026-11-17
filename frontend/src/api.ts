@@ -7,6 +7,7 @@ import type {
   Game,
   GameSession,
   HeatmapData,
+  InfluxExportResult,
   SettingsUpdatePayload,
   Summary,
   TopGame,
@@ -170,6 +171,12 @@ export const api = {
     patch<AppSettings>('/settings', payload),
   revealAgentKey: () => get<{ agent_api_key: string }>('/settings/agent-key'),
   rotateAgentKey: () => post<{ agent_api_key: string }>('/settings/agent-key/rotate'),
+  revealHomepageToken: () =>
+    get<{ homepage_api_token: string }>('/settings/homepage-token'),
+  rotateHomepageToken: () =>
+    post<{ homepage_api_token: string }>('/settings/homepage-token/rotate'),
+  exportInflux: () =>
+    post<InfluxExportResult>('/admin/influxdb/export'),
 
   downloadBackup: (format: 'json' | 'sqlite') =>
     download(`/admin/backup/export/${format}`),

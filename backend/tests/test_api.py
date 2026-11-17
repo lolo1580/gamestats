@@ -1,6 +1,9 @@
-from datetime import timedelta
 import json
+from datetime import timedelta
 
+import httpx
+
+import influx as influx_module
 from database import SessionLocal
 from models import Game, GameSession, utcnow
 
@@ -220,6 +223,101 @@ def test_settings_and_agent_key_rotation(client, agent_headers):
         headers={"X-Agent-Key": new_key},
     )
     assert accepted.status_code == 200
+
+
+def test_homepage_api_and_token_rotation(client):
+    missing = client.get("/api/homepage?token=anything")
+    assert missing.status_code == 503
+
+    updated = client.patch(
+        "/api/settings",
+        json={"homepage_api_token": "homepage-secret-token"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["homepage_api_token_set"] is True
+
+    response = client.get("/api/homepage?token=homepage-secret-token")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "today_seconds" in data
+    assert "active_games" in data
+
+    header_response = client.get(
+        "/api/homepage",
+        headers={"X-API-Key": "homepage-secret-token"},
+    )
+    assert header_response.status_code == 200
+    assert client.get("/api/homepage?token=wrong").status_code == 401
+
+    rotated = client.post("/api/settings/homepage-token/rotate")
+    assert rotated.status_code == 200
+    new_token = rotated.json()["homepage_api_token"]
+    assert new_token != "homepage-secret-token"
+    assert (
+        client.get("/api/homepage", headers={"X-API-Key": new_token}).status_code
+        == 200
+    )
+    assert (
+        client.get("/api/homepage", headers={"X-API-Key": "homepage-secret-token"}).status_code
+        == 401
+    )
+
+
+def test_influx_export(client, monkeypatch):
+    configured = client.patch(
+        "/api/settings",
+        json={
+            "influxdb_url": "http://influxdb:8086",
+            "influxdb_token": "influx-token",
+            "influxdb_org": "gamestats",
+            "influxdb_bucket": "gaming",
+            "influxdb_enabled": True,
+        },
+    )
+    assert configured.status_code == 200, configured.text
+    assert configured.json()["influxdb_configured"] is True
+
+    now = utcnow()
+    with SessionLocal() as db:
+        game = Game(name="Hades", name_key="hades")
+        db.add(game)
+        db.flush()
+        db.add(
+            GameSession(
+                game_id=game.id,
+                source="agent",
+                started_at=now - timedelta(hours=2),
+                ended_at=now - timedelta(hours=1),
+                last_heartbeat_at=now - timedelta(hours=1),
+                duration_seconds=3600,
+            )
+        )
+        db.commit()
+
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.content.decode("utf-8")
+        captured["url"] = str(request.url)
+        return httpx.Response(204)
+
+    real_client = httpx.Client(transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(influx_module.httpx, "Client", lambda **_: real_client)
+    try:
+        result = client.post("/api/admin/influxdb/export")
+    finally:
+        real_client.close()
+
+    assert result.status_code == 200, result.text
+    payload = result.json()
+    assert payload["skipped"] is False
+    assert payload["sessions_exported"] == 1
+    assert payload["points_written"] >= 2
+    assert "gamestats_session" in captured["body"]
+    assert "gamestats_summary" in captured["body"]
+    assert "game=Hades" in captured["body"]
+    assert "/api/v2/write" in captured["url"]
 
 
 def test_update_locale(client):

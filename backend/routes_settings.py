@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import secrets
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from schemas import AgentKeyOut, SettingsOut, SettingsUpdate
+from schemas import AgentKeyOut, HomepageTokenOut, SettingsOut, SettingsUpdate
 from security import AdminUser
 from settings_service import (
     SETTING_AGENT_API_KEY,
+    SETTING_HOMEPAGE_API_TOKEN,
     SETTING_IGDB_CLIENT_ID,
     SETTING_IGDB_CLIENT_SECRET,
+    SETTING_INFLUX_BUCKET,
+    SETTING_INFLUX_ENABLED,
+    SETTING_INFLUX_LAST_EXPORT,
+    SETTING_INFLUX_ORG,
+    SETTING_INFLUX_TOKEN,
+    SETTING_INFLUX_URL,
     SETTING_STEAM_API_KEY,
     SETTING_STEAM_ID,
     SETTING_TIMEZONE,
@@ -27,6 +35,7 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 def _settings_out(db: Session) -> SettingsOut:
     integration = get_integration_settings(db)
+    last_export = get_setting(db, SETTING_INFLUX_LAST_EXPORT) or None
     return SettingsOut(
         steam_api_key_hint=mask_secret(integration.steam_api_key),
         steam_api_key_set=bool(integration.steam_api_key),
@@ -39,6 +48,16 @@ def _settings_out(db: Session) -> SettingsOut:
         timezone=integration.timezone,
         steam_configured=integration.steam_configured,
         igdb_configured=integration.igdb_configured,
+        homepage_api_token_hint=mask_secret(integration.homepage_api_token),
+        homepage_api_token_set=bool(integration.homepage_api_token),
+        influxdb_url=integration.influxdb_url,
+        influxdb_token_hint=mask_secret(integration.influxdb_token),
+        influxdb_token_set=bool(integration.influxdb_token),
+        influxdb_org=integration.influxdb_org,
+        influxdb_bucket=integration.influxdb_bucket,
+        influxdb_enabled=integration.influxdb_enabled,
+        influxdb_configured=integration.influxdb_configured,
+        influxdb_last_export_at=last_export,
     )
 
 
@@ -90,6 +109,48 @@ def write_settings(
                 detail="Fuseau horaire invalide.",
             ) from exc
         updates[SETTING_TIMEZONE] = timezone
+    if "homepage_api_token" in fields:
+        token = (payload.homepage_api_token or "").strip()
+        if token and len(token) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Le token Homepage doit contenir au moins 8 caractères.",
+            )
+        updates[SETTING_HOMEPAGE_API_TOKEN] = token
+    if "influxdb_url" in fields:
+        url = (payload.influxdb_url or "").strip().rstrip("/")
+        if url:
+            parsed = urlparse(url)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="URL InfluxDB invalide (http:// ou https:// attendu).",
+                )
+        updates[SETTING_INFLUX_URL] = url
+    if "influxdb_token" in fields:
+        updates[SETTING_INFLUX_TOKEN] = (payload.influxdb_token or "").strip()
+    if "influxdb_org" in fields:
+        updates[SETTING_INFLUX_ORG] = (payload.influxdb_org or "").strip()
+    if "influxdb_bucket" in fields:
+        updates[SETTING_INFLUX_BUCKET] = (payload.influxdb_bucket or "").strip()
+    if "influxdb_enabled" in fields:
+        updates[SETTING_INFLUX_ENABLED] = (
+            "true" if payload.influxdb_enabled else "false"
+        )
+
+    current = get_integration_settings(db)
+    prospective_url = updates.get(SETTING_INFLUX_URL, current.influxdb_url)
+    prospective_token = updates.get(SETTING_INFLUX_TOKEN, current.influxdb_token)
+    prospective_org = updates.get(SETTING_INFLUX_ORG, current.influxdb_org)
+    prospective_bucket = updates.get(SETTING_INFLUX_BUCKET, current.influxdb_bucket)
+    enabled = updates.get(SETTING_INFLUX_ENABLED, str(current.influxdb_enabled).lower()) == "true"
+    if enabled and not all(
+        [prospective_url, prospective_token, prospective_org, prospective_bucket]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Renseignez l'URL, le token, l'organisation et le bucket avant d'activer InfluxDB.",
+        )
 
     update_settings(db, updates)
     return _settings_out(db)
@@ -112,3 +173,24 @@ def rotate_agent_key(
     value = secrets.token_urlsafe(32)
     update_settings(db, {SETTING_AGENT_API_KEY: value})
     return AgentKeyOut(agent_api_key=value)
+
+
+@router.get("/homepage-token", response_model=HomepageTokenOut)
+def reveal_homepage_token(
+    _admin: AdminUser, db: Session = Depends(get_db)
+) -> HomepageTokenOut:
+    value = get_setting(db, SETTING_HOMEPAGE_API_TOKEN)
+    if not value:
+        raise HTTPException(
+            status_code=404, detail="Aucun token Homepage configuré."
+        )
+    return HomepageTokenOut(homepage_api_token=value)
+
+
+@router.post("/homepage-token/rotate", response_model=HomepageTokenOut)
+def rotate_homepage_token(
+    _admin: AdminUser, db: Session = Depends(get_db)
+) -> HomepageTokenOut:
+    value = secrets.token_urlsafe(32)
+    update_settings(db, {SETTING_HOMEPAGE_API_TOKEN: value})
+    return HomepageTokenOut(homepage_api_token=value)

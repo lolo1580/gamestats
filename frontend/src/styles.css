@@ -3024,3 +3024,38 @@ code {
     grid-template-columns: 1fr;
   }
 }
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-soft);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
+.inline-hint {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+.docs-code pre {
+  width: 100%;
+  margin: 0;
+  overflow-x: auto;
+  padding: 10px;
+  color: var(--text-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 1.55;
+}

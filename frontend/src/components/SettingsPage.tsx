@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  Globe2,
   KeyRound,
   RefreshCw,
   Save,
@@ -71,6 +72,13 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
   const [igdbClientId, setIgdbClientId] = useState('')
   const [igdbSecret, setIgdbSecret] = useState('')
   const [revealedAgentKey, setRevealedAgentKey] = useState<string | null>(null)
+  const [revealedHomepageToken, setRevealedHomepageToken] = useState<string | null>(null)
+  const [influxUrl, setInfluxUrl] = useState('')
+  const [influxToken, setInfluxToken] = useState('')
+  const [influxOrg, setInfluxOrg] = useState('')
+  const [influxBucket, setInfluxBucket] = useState('')
+  const [influxEnabled, setInfluxEnabled] = useState(false)
+  const [influxBusy, setInfluxBusy] = useState(false)
 
   const [newUsername, setNewUsername] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -103,6 +111,10 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       setTimezone(nextSettings.timezone)
       setSteamId(nextSettings.steam_id)
       setIgdbClientId(nextSettings.igdb_client_id)
+      setInfluxUrl(nextSettings.influxdb_url)
+      setInfluxOrg(nextSettings.influxdb_org)
+      setInfluxBucket(nextSettings.influxdb_bucket)
+      setInfluxEnabled(nextSettings.influxdb_enabled)
     } catch (loadError) {
       reportError(loadError)
     } finally {
@@ -145,14 +157,24 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       const payload: SettingsUpdatePayload = {
         steam_id: steamId.trim(),
         igdb_client_id: igdbClientId.trim(),
+        influxdb_url: influxUrl.trim(),
+        influxdb_org: influxOrg.trim(),
+        influxdb_bucket: influxBucket.trim(),
+        influxdb_enabled: influxEnabled,
       }
       if (steamKey.trim()) payload.steam_api_key = steamKey.trim()
       if (igdbSecret.trim()) payload.igdb_client_secret = igdbSecret.trim()
+      if (influxToken.trim()) payload.influxdb_token = influxToken.trim()
 
       const next = await api.updateSettings(payload)
       setSettings(next)
       setSteamKey('')
       setIgdbSecret('')
+      setInfluxToken('')
+      setInfluxUrl(next.influxdb_url)
+      setInfluxOrg(next.influxdb_org)
+      setInfluxBucket(next.influxdb_bucket)
+      setInfluxEnabled(next.influxdb_enabled)
       flash(t('settings.integrations.saved'))
     } catch (saveError) {
       reportError(saveError)
@@ -213,6 +235,71 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       reportError(rotateError)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const revealHomepageToken = async () => {
+    if (revealedHomepageToken) {
+      setRevealedHomepageToken(null)
+      return
+    }
+    try {
+      const result = await api.revealHomepageToken()
+      setRevealedHomepageToken(result.homepage_api_token)
+    } catch (tokenError) {
+      reportError(tokenError)
+    }
+  }
+
+  const copyHomepageToken = async () => {
+    try {
+      const token =
+        revealedHomepageToken ??
+        (await api.revealHomepageToken()).homepage_api_token
+      setRevealedHomepageToken(token)
+      await copyToClipboard(token)
+      flash(t('settings.integrations.homepageCopied'))
+    } catch (copyError) {
+      reportError(copyError)
+    }
+  }
+
+  const rotateHomepageToken = async () => {
+    if (!window.confirm(t('settings.integrations.homepageRotateConfirm'))) return
+    setSaving(true)
+    setError(null)
+    try {
+      const result = await api.rotateHomepageToken()
+      setRevealedHomepageToken(result.homepage_api_token)
+      setSettings(await api.settings())
+      flash(t('settings.integrations.homepageRotated'))
+    } catch (tokenError) {
+      reportError(tokenError)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const exportInfluxNow = async () => {
+    setInfluxBusy(true)
+    setError(null)
+    try {
+      const result = await api.exportInflux()
+      if (result.skipped) {
+        flash(t('settings.integrations.influxSkipped'))
+      } else {
+        flash(
+          t('settings.integrations.influxExported', {
+            sessions: result.sessions_exported ?? 0,
+            points: result.points_written ?? 0,
+          }),
+        )
+      }
+      setSettings(await api.settings())
+    } catch (exportError) {
+      reportError(exportError)
+    } finally {
+      setInfluxBusy(false)
     }
   }
 
@@ -571,6 +658,161 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                   {t('settings.integrations.deleteIgdbSecret')}
                 </button>
               )}
+            </div>
+
+            <div className="settings-group">
+              <div className="settings-group__head">
+                <h3>{t('settings.integrations.homepage')}</h3>
+                <span
+                  className={`config-status${
+                    settings.homepage_api_token_set ? ' is-on' : ' is-off'
+                  }`}
+                >
+                  {settings.homepage_api_token_set
+                    ? t('common.configured')
+                    : t('settings.integrations.homepageMissing')}
+                </span>
+              </div>
+              <p className="settings-hint">{t('settings.integrations.homepageSubtitle')}</p>
+              <div className="agent-key">
+                <code>{revealedHomepageToken ?? settings.homepage_api_token_hint ?? '—'}</code>
+                <button
+                  type="button"
+                  className="button button--icon"
+                  onClick={revealHomepageToken}
+                  disabled={!settings.homepage_api_token_set}
+                  aria-label={
+                    revealedHomepageToken
+                      ? t('settings.integrations.homepageHide')
+                      : t('settings.integrations.homepageReveal')
+                  }
+                  title={
+                    revealedHomepageToken
+                      ? t('settings.integrations.homepageHide')
+                      : t('settings.integrations.homepageReveal')
+                  }
+                >
+                  {revealedHomepageToken ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+                <button
+                  type="button"
+                  className="button button--icon"
+                  onClick={copyHomepageToken}
+                  disabled={!settings.homepage_api_token_set}
+                  aria-label={t('settings.integrations.homepageCopy')}
+                  title={t('settings.integrations.homepageCopy')}
+                >
+                  <Copy size={15} />
+                </button>
+              </div>
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={rotateHomepageToken}
+                  disabled={saving}
+                >
+                  <Globe2 size={14} strokeWidth={2} />
+                  {t('settings.integrations.homepageRotate')}
+                </button>
+              </div>
+              <p className="settings-hint">
+                {t('settings.integrations.homepageEndpoint', {
+                  url: `${window.location.origin}/api/homepage`,
+                })}
+              </p>
+            </div>
+
+            <div className="settings-group">
+              <div className="settings-group__head">
+                <h3>{t('settings.integrations.influxdb')}</h3>
+                <span
+                  className={`config-status${
+                    settings.influxdb_configured ? ' is-on' : ' is-off'
+                  }`}
+                >
+                  {settings.influxdb_configured
+                    ? t('common.configured')
+                    : t('common.notConfigured')}
+                </span>
+              </div>
+              <p className="settings-hint">
+                {t('settings.integrations.influxdbSubtitle')}
+              </p>
+              <div className="form-grid">
+                <label className="field">
+                  <span>{t('settings.integrations.influxUrl')}</span>
+                  <input
+                    className="input"
+                    value={influxUrl}
+                    onChange={(event) => setInfluxUrl(event.target.value)}
+                    placeholder="http://influxdb:8086"
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="field">
+                  <span>{t('settings.integrations.influxToken')}</span>
+                  <input
+                    className="input"
+                    type="password"
+                    value={influxToken}
+                    onChange={(event) => setInfluxToken(event.target.value)}
+                    placeholder={
+                      settings.influxdb_token_set
+                        ? settings.influxdb_token_hint
+                        : t('settings.integrations.keepSecret')
+                    }
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="field">
+                  <span>{t('settings.integrations.influxOrg')}</span>
+                  <input
+                    className="input"
+                    value={influxOrg}
+                    onChange={(event) => setInfluxOrg(event.target.value)}
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="field">
+                  <span>{t('settings.integrations.influxBucket')}</span>
+                  <input
+                    className="input"
+                    value={influxBucket}
+                    onChange={(event) => setInfluxBucket(event.target.value)}
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={influxEnabled}
+                  onChange={(event) => setInfluxEnabled(event.target.checked)}
+                />
+                <span>{t('settings.integrations.influxEnabled')}</span>
+              </label>
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={exportInfluxNow}
+                  disabled={influxBusy || !settings.influxdb_configured}
+                >
+                  <RefreshCw
+                    size={14}
+                    strokeWidth={2}
+                    className={influxBusy ? 'is-spinning' : undefined}
+                  />
+                  {t('settings.integrations.influxExportNow')}
+                </button>
+                <span className="settings-hint inline-hint">
+                  {t('settings.integrations.influxLastExport')} :{' '}
+                  {settings.influxdb_last_export_at
+                    ? formatRelative(settings.influxdb_last_export_at, lang)
+                    : t('common.never')}
+                </span>
+              </div>
             </div>
 
             <button type="submit" className="button button--primary" disabled={saving}>
@@ -975,6 +1217,46 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               <code>Header X-Agent-Key: &lt;agent key&gt;</code>
             </div>
             <p className="settings-hint">{t('settings.docs.agentKeyHint')}</p>
+          </section>
+
+          <section className="panel settings-panel">
+            <header className="card-head">
+              <div>
+                <h2>{t('settings.docs.homepageTitle')}</h2>
+                <p>{t('settings.docs.homepageSubtitle')}</p>
+              </div>
+            </header>
+            <div className="docs-code">
+              <pre><code>{`widget:
+  type: customapi
+  url: ${window.location.origin}/api/homepage
+  refreshInterval: 60000
+  headers:
+    X-API-Key: <homepage-token>
+  mappings:
+    - field: active_games
+      label: In game
+    - field: week
+      label: This week
+    - field: today
+      label: Today`}</code></pre>
+            </div>
+          </section>
+
+          <section className="panel settings-panel">
+            <header className="card-head">
+              <div>
+                <h2>{t('settings.docs.influxTitle')}</h2>
+                <p>{t('settings.docs.influxSubtitle')}</p>
+              </div>
+            </header>
+            <div className="docs-code">
+              <code>gamestats_session: game, source, game_id, duration_seconds</code>
+              <code>gamestats_summary: today_seconds, week_seconds, total_seconds, sessions_week, active_sessions, library_count, agents_online</code>
+            </div>
+            <p className="settings-hint">
+              {t('settings.docs.influxHint')}
+            </p>
           </section>
         </div>
       )}

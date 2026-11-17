@@ -31,6 +31,10 @@ The interface ships in **French and English**, with **dark and light themes**.
   credentials from the UI. Secrets are masked in responses.
 - **Backups** — export a readable JSON snapshot or a full SQLite database, then
   restore either format from the settings page.
+- **Homepage widget API** — a token-protected JSON endpoint ready for the
+  gethomepage.dev `customapi` widget.
+- **InfluxDB v2 export** — scheduled or manual export of sessions and summary
+  metrics with a dedicated token.
 - **Protected documentation** — Swagger UI and ReDoc require an authenticated
   session, just like the dashboard.
 - **Docker Compose** — backend, SQLite persistence, and an nginx-served frontend.
@@ -56,8 +60,8 @@ frontend (React/nginx) ◄──────── GET /api/* ──────
   state. Agent sessions are closed after `AGENT_STALE_SECONDS` without a
   heartbeat.
 - **Scheduler** closes stale sessions every minute, syncs Steam every 15 minutes,
-  and enriches IGDB data every 60 minutes. Run a single uvicorn worker so the
-  scheduler is not duplicated.
+  enriches IGDB data every 60 minutes, and exports InfluxDB points every
+  15 minutes. Run a single uvicorn worker so the scheduler is not duplicated.
 - **Frontend** is a React/Vite SPA served by nginx. `/api` is proxied to the
   backend.
 
@@ -105,6 +109,7 @@ Copy `.env.example` to `.env` and adjust the values:
 | `AGENT_STALE_SECONDS`   | `180`                | Time without a heartbeat before an agent session is closed.        |
 | `STEAM_SYNC_MINUTES`    | `15`                 | Steam synchronization interval.                                    |
 | `IGDB_SYNC_MINUTES`     | `60`                 | IGDB enrichment interval.                                          |
+| `INFLUX_EXPORT_MINUTES` | `15`                 | InfluxDB export interval.                                          |
 | `SESSION_DAYS`          | `7`                  | Browser session lifetime, in days.                                |
 | `COOKIE_SECURE`         | `false`              | Set to `true` when serving the app over HTTPS.                     |
 | `SCHEDULER_ENABLED`     | `true`               | Set to `false` to disable background jobs.                         |
@@ -243,6 +248,8 @@ not be visible. Check the log file if nothing appears in the dashboard.
 | `GET`  | `/api/admin/backup/export/sqlite`| Download a SQLite backup (admin)          |
 | `POST` | `/api/admin/backup/import/json`  | Restore a JSON backup (admin)             |
 | `POST` | `/api/admin/backup/restore/sqlite` | Restore a SQLite backup (admin)         |
+| `GET`  | `/api/homepage`          | Homepage widget JSON (`X-API-Key` or token)      |
+| `POST` | `/api/admin/influxdb/export` | Export sessions and metrics to InfluxDB     |
 | `POST` | `/api/admin/sync/steam`   | Force a Steam sync (admin session)               |
 | `POST` | `/api/admin/enrich/igdb`  | Force IGDB enrichment (admin session)            |
 
@@ -250,6 +257,45 @@ Interactive OpenAPI documentation is available at `/docs` and `/redoc`. Both
 require a logged-in session. Dashboard and library endpoints also require a
 session; only `/api/health`, authentication routes, and the agent heartbeat are
 public.
+
+### Homepage integration
+
+Generate a **Homepage token** in **Settings → Intégrations**, then add a
+`customapi` widget to gethomepage.dev:
+
+```yaml
+- GameStats:
+    widget:
+      type: customapi
+      url: http://YOUR-HOST:8090/api/homepage
+      refreshInterval: 60000
+      headers:
+        X-API-Key: YOUR_HOMEPAGE_TOKEN
+      mappings:
+        - field: active_games
+          label: In game
+        - field: week
+          label: This week
+        - field: today
+          label: Today
+        - field: library_count
+          label: Games
+```
+
+The token can also be passed as `?token=...`, but the header is preferred.
+
+### InfluxDB export
+
+In **Settings → Intégrations**, configure the InfluxDB v2 URL, token,
+organization, bucket, and enable automatic export. The scheduler exports:
+
+- `gamestats_session` points with `game`, `source`, `game_id`, and
+  `duration_seconds`;
+- one `gamestats_summary` point per run with daily, weekly, total, session, and
+  library metrics.
+
+Use **Export now** to trigger a manual run. The last successful export timestamp
+is stored in the database.
 
 Force a Steam synchronization with an admin session:
 
@@ -280,6 +326,9 @@ gamestats/
 │   ├── routes_users.py      # User management
 │   ├── routes_settings.py   # Integration settings
 │   ├── routes_backup.py     # JSON/SQLite backup and restore
+│   ├── routes_homepage.py   # gethomepage.dev widget API
+│   ├── routes_influx.py     # Manual InfluxDB export
+│   ├── influx.py            # InfluxDB line-protocol exporter
 │   ├── heartbeat.py         # Agent session lifecycle
 │   ├── stats.py             # Summary, daily, heatmap, top games
 │   ├── scheduler.py         # Background jobs
@@ -359,6 +408,7 @@ npm run build
 - Integration secrets are stored in SQLite and masked in API responses. Protect
   the `data` directory and backups accordingly. Backups include password hashes
   and integration secrets; store them securely.
+- Homepage and InfluxDB tokens are stored in SQLite and masked in API responses.
 - The default `AGENT_API_KEY` is `change-me`; change it before exposing the
   service on a network.
 - `.env`, the SQLite database, and local build artifacts are excluded from Git.
@@ -373,6 +423,8 @@ npm run build
   same game create separate sessions.
 - Restoring a backup replaces users, games, sessions, settings, and invalidates
   current login sessions.
+- InfluxDB exports are incremental and idempotent by point timestamp; changing
+  the bucket or recreating the database does not automatically replay history.
 
 ## Changelog
 

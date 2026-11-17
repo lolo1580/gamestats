@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     agent_stale_seconds: int = 180
     steam_sync_minutes: int = 15
     igdb_sync_minutes: int = 60
+    influx_export_minutes: int = 15
     igdb_enrich_limit: int = 8
     steam_achievement_limit: int = 8
     session_days: int = 7

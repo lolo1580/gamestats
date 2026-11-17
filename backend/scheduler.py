@@ -11,6 +11,7 @@ from collectors.steam import sync_steam_library
 from config import get_settings
 from database import SessionLocal
 from heartbeat import close_stale_agent_sessions
+from influx import export_to_influx
 from models import utcnow
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,16 @@ def _igdb_job() -> None:
         logger.exception("Échec de l'enrichissement IGDB.")
 
 
+def _influx_job() -> None:
+    try:
+        with SessionLocal() as db:
+            result = export_to_influx(db)
+            if result.get("skipped"):
+                logger.debug("Export InfluxDB ignoré : %s", result.get("reason"))
+    except Exception:
+        logger.exception("Échec de l'export InfluxDB.")
+
+
 def start_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is not None:
@@ -86,13 +97,21 @@ def start_scheduler() -> BackgroundScheduler:
         name="Enrichissement IGDB",
         next_run_time=utcnow() + timedelta(seconds=30),
     )
+    scheduler.add_job(
+        _influx_job,
+        IntervalTrigger(minutes=max(5, settings.influx_export_minutes)),
+        id="export-influxdb",
+        name="Export InfluxDB",
+        next_run_time=utcnow() + timedelta(seconds=45),
+    )
 
     scheduler.start()
     _scheduler = scheduler
     logger.info(
-        "Planificateur démarré (Steam: %s min, IGDB: %s min, configuration via /api/settings).",
+        "Planificateur démarré (Steam: %s min, IGDB: %s min, InfluxDB: %s min, configuration via /api/settings).",
         max(5, settings.steam_sync_minutes),
         max(15, settings.igdb_sync_minutes),
+        max(5, settings.influx_export_minutes),
     )
     return scheduler
 

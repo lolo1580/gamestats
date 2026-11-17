@@ -14,11 +14,20 @@ SETTING_STEAM_ID = "steam_id"
 SETTING_IGDB_CLIENT_ID = "igdb_client_id"
 SETTING_IGDB_CLIENT_SECRET = "igdb_client_secret"
 SETTING_TIMEZONE = "timezone"
+SETTING_HOMEPAGE_API_TOKEN = "homepage_api_token"
+SETTING_INFLUX_URL = "influxdb_url"
+SETTING_INFLUX_TOKEN = "influxdb_token"
+SETTING_INFLUX_ORG = "influxdb_org"
+SETTING_INFLUX_BUCKET = "influxdb_bucket"
+SETTING_INFLUX_ENABLED = "influxdb_enabled"
+SETTING_INFLUX_LAST_EXPORT = "influxdb_last_export_at"
 
 SECRET_SETTINGS = {
     SETTING_AGENT_API_KEY,
     SETTING_STEAM_API_KEY,
     SETTING_IGDB_CLIENT_SECRET,
+    SETTING_HOMEPAGE_API_TOKEN,
+    SETTING_INFLUX_TOKEN,
 }
 
 SETTING_DEFAULTS = {
@@ -28,6 +37,13 @@ SETTING_DEFAULTS = {
     SETTING_IGDB_CLIENT_ID: lambda: get_settings().igdb_client_id,
     SETTING_IGDB_CLIENT_SECRET: lambda: get_settings().igdb_client_secret,
     SETTING_TIMEZONE: lambda: get_settings().timezone,
+    SETTING_HOMEPAGE_API_TOKEN: lambda: "",
+    SETTING_INFLUX_URL: lambda: "",
+    SETTING_INFLUX_TOKEN: lambda: "",
+    SETTING_INFLUX_ORG: lambda: "",
+    SETTING_INFLUX_BUCKET: lambda: "",
+    SETTING_INFLUX_ENABLED: lambda: "false",
+    SETTING_INFLUX_LAST_EXPORT: lambda: "",
 }
 
 
@@ -39,6 +55,12 @@ class IntegrationSettings:
     igdb_client_id: str
     igdb_client_secret: str
     timezone: str
+    homepage_api_token: str
+    influxdb_url: str
+    influxdb_token: str
+    influxdb_org: str
+    influxdb_bucket: str
+    influxdb_enabled: bool
 
     @property
     def steam_configured(self) -> bool:
@@ -47,6 +69,15 @@ class IntegrationSettings:
     @property
     def igdb_configured(self) -> bool:
         return bool(self.igdb_client_id and self.igdb_client_secret)
+
+    @property
+    def influxdb_configured(self) -> bool:
+        return bool(
+            self.influxdb_url
+            and self.influxdb_token
+            and self.influxdb_org
+            and self.influxdb_bucket
+        )
 
 
 def ensure_default_settings(db: Session) -> None:
@@ -79,6 +110,13 @@ def get_integration_settings(db: Session) -> IntegrationSettings:
             db, SETTING_IGDB_CLIENT_SECRET, settings.igdb_client_secret
         ),
         timezone=get_setting(db, SETTING_TIMEZONE, settings.timezone),
+        homepage_api_token=get_setting(db, SETTING_HOMEPAGE_API_TOKEN, ""),
+        influxdb_url=get_setting(db, SETTING_INFLUX_URL, ""),
+        influxdb_token=get_setting(db, SETTING_INFLUX_TOKEN, ""),
+        influxdb_org=get_setting(db, SETTING_INFLUX_ORG, ""),
+        influxdb_bucket=get_setting(db, SETTING_INFLUX_BUCKET, ""),
+        influxdb_enabled=get_setting(db, SETTING_INFLUX_ENABLED, "false").lower()
+        == "true",
     )
 
 
@@ -86,6 +124,10 @@ def get_agent_api_key(db: Session) -> str:
     return get_setting(
         db, SETTING_AGENT_API_KEY, get_settings().agent_api_key
     ).strip()
+
+
+def get_homepage_api_token(db: Session) -> str:
+    return get_setting(db, SETTING_HOMEPAGE_API_TOKEN, "").strip()
 
 
 def get_timezone_name(db: Session) -> str:

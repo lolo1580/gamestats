@@ -19,6 +19,8 @@ from heartbeat import process_heartbeat
 from models import Agent, User, utcnow
 from routes_auth import router as auth_router
 from routes_backup import router as backup_router
+from routes_homepage import router as homepage_router
+from routes_influx import router as influx_router
 from routes_settings import router as settings_router
 from routes_users import router as users_router
 from scheduler import start_scheduler, stop_scheduler
@@ -82,7 +84,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="GameStats API",
-    version="1.1.0",
+    version="1.2.0",
     description="Suivi de sessions de jeu (agent PC + Steam) et statistiques.",
     lifespan=lifespan,
     docs_url=None,
@@ -102,6 +104,8 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(settings_router)
 app.include_router(backup_router)
+app.include_router(homepage_router)
+app.include_router(influx_router)
 
 
 @app.get("/")
