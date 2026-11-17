@@ -90,7 +90,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="GameStats API",
-    version="1.7.0",
+    version="1.8.0",
     description="Suivi de sessions de jeu (agent PC + Steam) et statistiques.",
     lifespan=lifespan,
     docs_url=None,
@@ -140,6 +140,7 @@ def health(db: Session = Depends(get_db)) -> dict:
     integration = get_integration_settings(db)
     return {
         "status": "ok",
+        "version": app.version,
         "time": iso_utc(utcnow()),
         "steam_configured": integration.steam_configured,
         "igdb_configured": integration.igdb_configured,

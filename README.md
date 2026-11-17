@@ -161,6 +161,18 @@ GAMESTATS_IMAGE_TAG=preview-2026-11-17-1 \
   docker compose -f compose.preview.yml up -d
 ```
 
+The preview services use `pull_policy: always`, so `up -d` checks GHCR for a
+newer image. If the interface still looks old, force a browser refresh
+(`Ctrl+Shift+R`) and check the backend version:
+
+```bash
+curl -s http://SERVER:8091/api/health
+```
+
+The response contains `"version": "1.8.0"` for the current preview images. The
+frontend `index.html` is served with `no-cache`, so hashed assets can be updated
+without a stale SPA shell.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and adjust the values:
