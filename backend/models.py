@@ -22,6 +22,9 @@ class Game(Base):
     xbox_title_id: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True, index=True)
     ubisoft_space_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
     gog_product_id: Mapped[int | None] = mapped_column(Integer, unique=True, nullable=True, index=True)
+    epic_catalog_item_id: Mapped[str | None] = mapped_column(
+        String(64), unique=True, nullable=True, index=True
+    )
     cover_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     genres: Mapped[str | None] = mapped_column(Text, nullable=True)
     igdb_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -54,6 +57,12 @@ class Game(Base):
     gog_achievements_total: Mapped[int] = mapped_column(Integer, default=0)
     gog_achievements_unlocked: Mapped[int] = mapped_column(Integer, default=0)
     gog_achievements_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    epic_namespace: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    epic_achievements_total: Mapped[int] = mapped_column(Integer, default=0)
+    epic_achievements_unlocked: Mapped[int] = mapped_column(Integer, default=0)
+    epic_achievements_checked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 

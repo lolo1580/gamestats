@@ -39,6 +39,10 @@ SETTING_GOG_REFRESH_TOKEN = "gog_refresh_token"
 SETTING_GOG_USER_ID = "gog_user_id"
 SETTING_GOG_USERNAME = "gog_username"
 SETTING_GOG_LAST_SYNC = "gog_last_sync_at"
+SETTING_EPIC_REFRESH_TOKEN = "epic_refresh_token"
+SETTING_EPIC_ACCOUNT_ID = "epic_account_id"
+SETTING_EPIC_DISPLAY_NAME = "epic_display_name"
+SETTING_EPIC_LAST_SYNC = "epic_last_sync_at"
 
 SECRET_SETTINGS = {
     SETTING_AGENT_API_KEY,
@@ -50,6 +54,7 @@ SECRET_SETTINGS = {
     SETTING_XBOX_DEVICE_CODE,
     SETTING_UBISOFT_REMEMBER_ME_TICKET,
     SETTING_GOG_REFRESH_TOKEN,
+    SETTING_EPIC_REFRESH_TOKEN,
 }
 
 SETTING_DEFAULTS = {
@@ -84,6 +89,10 @@ SETTING_DEFAULTS = {
     SETTING_GOG_USER_ID: lambda: "",
     SETTING_GOG_USERNAME: lambda: "",
     SETTING_GOG_LAST_SYNC: lambda: "",
+    SETTING_EPIC_REFRESH_TOKEN: lambda: "",
+    SETTING_EPIC_ACCOUNT_ID: lambda: "",
+    SETTING_EPIC_DISPLAY_NAME: lambda: "",
+    SETTING_EPIC_LAST_SYNC: lambda: "",
 }
 
 
@@ -113,6 +122,9 @@ class IntegrationSettings:
     gog_refresh_token: str
     gog_user_id: str
     gog_username: str
+    epic_refresh_token: str
+    epic_account_id: str
+    epic_display_name: str
 
     @property
     def steam_configured(self) -> bool:
@@ -146,6 +158,10 @@ class IntegrationSettings:
     @property
     def gog_connected(self) -> bool:
         return bool(self.gog_refresh_token and self.gog_user_id)
+
+    @property
+    def epic_connected(self) -> bool:
+        return bool(self.epic_refresh_token and self.epic_account_id)
 
 
 def ensure_default_settings(db: Session) -> None:
@@ -208,6 +224,9 @@ def get_integration_settings(db: Session) -> IntegrationSettings:
         gog_refresh_token=get_setting(db, SETTING_GOG_REFRESH_TOKEN, ""),
         gog_user_id=get_setting(db, SETTING_GOG_USER_ID, ""),
         gog_username=get_setting(db, SETTING_GOG_USERNAME, ""),
+        epic_refresh_token=get_setting(db, SETTING_EPIC_REFRESH_TOKEN, ""),
+        epic_account_id=get_setting(db, SETTING_EPIC_ACCOUNT_ID, ""),
+        epic_display_name=get_setting(db, SETTING_EPIC_DISPLAY_NAME, ""),
     )
 
 

@@ -4,6 +4,8 @@ import type {
   AuthStatus,
   CurrentUser,
   DailyStats,
+  EpicAuthUrl,
+  EpicResult,
   Game,
   GameSession,
   GogAuthUrl,
@@ -198,6 +200,10 @@ export const api = {
   connectGog: (code: string) => post<GogResult>('/gog/connect', { code }),
   syncGog: () => post<GogResult>('/gog/sync'),
   disconnectGog: () => post<{ ok: boolean }>('/gog/disconnect'),
+  epicAuthUrl: () => get<EpicAuthUrl>('/epic/auth-url'),
+  connectEpic: (code: string) => post<EpicResult>('/epic/connect', { code }),
+  syncEpic: () => post<EpicResult>('/epic/sync'),
+  disconnectEpic: () => post<{ ok: boolean }>('/epic/disconnect'),
 
   downloadBackup: (format: 'json' | 'sqlite') =>
     download(`/admin/backup/export/${format}`),

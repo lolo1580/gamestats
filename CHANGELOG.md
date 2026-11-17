@@ -41,13 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   first/last dates, session counts, and library badges.
 - GOG integration with an OAuth authorization-code connection, owned games,
   covers, achievement progress, library badges, and a 60-minute sync.
+- Epic Games integration with an OAuth authorization-code connection, owned
+  games, catalog covers, partial achievements, library badges, and a 120-minute
+  sync.
 
 ### Changed
 
 - Settings integrations now cover Steam, IGDB, Homepage, InfluxDB, Xbox,
-  Ubisoft, and GOG.
-- The SQLite schema now migrates new Xbox, Ubisoft, and GOG columns on existing
-  game tables.
+  Ubisoft, GOG, and Epic Games.
+- The SQLite schema now migrates new Xbox, Ubisoft, GOG, and Epic Games columns
+  on existing game tables.
 - Dashboard, library, sessions, stats, agents, user, and settings endpoints now
   require an authenticated session.
 - Admin sync/enrichment endpoints now require an administrator session instead

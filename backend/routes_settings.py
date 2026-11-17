@@ -16,6 +16,9 @@ from settings_service import (
     SETTING_GOG_LAST_SYNC,
     SETTING_GOG_REFRESH_TOKEN,
     SETTING_GOG_USERNAME,
+    SETTING_EPIC_DISPLAY_NAME,
+    SETTING_EPIC_LAST_SYNC,
+    SETTING_EPIC_REFRESH_TOKEN,
     SETTING_IGDB_CLIENT_ID,
     SETTING_IGDB_CLIENT_SECRET,
     SETTING_INFLUX_BUCKET,
@@ -91,6 +94,11 @@ def _settings_out(db: Session) -> SettingsOut:
         gog_username=integration.gog_username,
         gog_connected=integration.gog_connected,
         gog_last_sync_at=get_setting(db, SETTING_GOG_LAST_SYNC) or None,
+        epic_refresh_token_hint=mask_secret(integration.epic_refresh_token),
+        epic_refresh_token_set=bool(integration.epic_refresh_token),
+        epic_display_name=integration.epic_display_name,
+        epic_connected=integration.epic_connected,
+        epic_last_sync_at=get_setting(db, SETTING_EPIC_LAST_SYNC) or None,
     )
 
 

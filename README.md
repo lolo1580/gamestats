@@ -9,7 +9,8 @@ The interface ships in **French and English**, with **dark and light themes**.
 
 Supported sources: **PC agent**, **Steam**, **Xbox** (achievements, gamerscore,
 and recent games), **Ubisoft Connect** (games, dates, and session counts), **GOG**
-(library and achievements), and **IGDB** metadata.
+(library and achievements), **Epic Games** (library and partial achievements),
+and **IGDB** metadata.
 
 ## Features
 
@@ -30,6 +31,10 @@ and recent games), **Ubisoft Connect** (games, dates, and session counts), **GOG
   GOG Galaxy API, with an OAuth authorization-code connection. No GOG password is
   stored. GOG does not expose reliable playtime through its web API; PC playtime
   continues to come from the agent.
+- **Epic Games sync** — owned games, catalog covers, and achievement progress
+  where Epic exposes it, with an OAuth authorization-code connection. No Epic
+  password is stored. Epic does not expose reliable playtime; PC playtime
+  continues to come from the agent.
 - **Double-count protection** — Steam playtime deltas already covered by an
   agent session are ignored.
 - **IGDB enrichment** — HD covers and genres for games that do not have them yet.
@@ -43,8 +48,8 @@ and recent games), **Ubisoft Connect** (games, dates, and session counts), **GOG
 - **Accounts and roles** — first-run admin setup, login/logout, local sessions,
   user management, and `admin` / `viewer` roles.
 - **Backend settings** — manage the agent key, timezone, Steam, IGDB, Homepage,
-  InfluxDB, Xbox, Ubisoft, and GOG integration from the UI. Secrets are masked in
-  responses.
+  InfluxDB, Xbox, Ubisoft, GOG, and Epic Games integrations from the UI. Secrets
+  are masked in responses.
 - **Backups** — export a readable JSON snapshot or a full SQLite database, then
   restore either format from the settings page.
 - **Homepage widget API** — a token-protected JSON endpoint ready for the
@@ -77,8 +82,9 @@ frontend (React/nginx) ◄──────── GET /api/* ──────
   heartbeat.
 - **Scheduler** closes stale sessions every minute, syncs Steam every 15 minutes,
   enriches IGDB data every 60 minutes, exports InfluxDB points every 15 minutes,
-  syncs Xbox every 30 minutes, syncs Ubisoft every 60 minutes, and syncs GOG every
-  60 minutes. Run a single uvicorn worker so the scheduler is not duplicated.
+  syncs Xbox every 30 minutes, syncs Ubisoft every 60 minutes, syncs GOG every
+  60 minutes, and syncs Epic Games every 120 minutes. Run a single uvicorn worker
+  so the scheduler is not duplicated.
 - **Frontend** is a React/Vite SPA served by nginx. `/api` is proxied to the
   backend.
 
@@ -131,6 +137,7 @@ Copy `.env.example` to `.env` and adjust the values:
 | `XBOX_SYNC_MINUTES`     | `30`                 | Xbox synchronization interval.                                     |
 | `UBISOFT_SYNC_MINUTES`  | `60`                 | Ubisoft synchronization interval.                                  |
 | `GOG_SYNC_MINUTES`      | `60`                 | GOG synchronization interval.                                      |
+| `EPIC_SYNC_MINUTES`     | `120`                | Epic Games synchronization interval.                               |
 | `SESSION_DAYS`          | `7`                  | Browser session lifetime, in days.                                |
 | `COOKIE_SECURE`         | `false`              | Set to `true` when serving the app over HTTPS.                     |
 | `SCHEDULER_ENABLED`     | `true`               | Set to `false` to disable background jobs.                         |
@@ -234,6 +241,22 @@ that token, and keeps it up to date automatically.
 
 The GOG integration is unofficial and may need updates if GOG changes its API.
 Disconnect the account in Settings to revoke the stored token.
+
+## Epic Games setup
+
+Epic support uses the **unofficial Epic Games launcher API** with the public
+launcher OAuth client. It imports owned games, catalog covers, and achievement
+progress where Epic exposes it. Epic does **not** expose reliable playtime, so PC
+playtime remains measured by the agent.
+
+Open **Settings → Intégrations → Epic Games**, click **Ouvrir la connexion Epic**,
+sign in, then copy the `authorizationCode` value from the JSON page shown after
+login (the whole page can also be pasted). GameStats exchanges it for a refresh
+token, stores only that token, and keeps it up to date automatically.
+
+The Epic integration is unofficial and may need updates if Epic changes its API.
+Achievements are available only for supported games. Disconnect the account in
+Settings to revoke the stored token.
 
 ## Windows agent
 
@@ -341,6 +364,10 @@ not be visible. Check the log file if nothing appears in the dashboard.
 | `POST` | `/api/gog/connect`       | Connect with a GOG authorization code (admin)    |
 | `POST` | `/api/gog/sync`          | Force a GOG synchronization (admin)              |
 | `POST` | `/api/gog/disconnect`    | Disconnect the GOG account (admin)               |
+| `GET`  | `/api/epic/auth-url`     | Read the Epic Games authorization URL (admin)    |
+| `POST` | `/api/epic/connect`      | Connect with an Epic authorization code (admin)  |
+| `POST` | `/api/epic/sync`         | Force an Epic Games synchronization (admin)      |
+| `POST` | `/api/epic/disconnect`   | Disconnect the Epic Games account (admin)        |
 | `POST` | `/api/admin/sync/steam`   | Force a Steam sync (admin session)               |
 | `POST` | `/api/admin/enrich/igdb`  | Force IGDB enrichment (admin session)            |
 
@@ -426,6 +453,8 @@ gamestats/
 │   ├── collectors/ubisoft.py # Ubisoft Connect API client and parser
 │   ├── routes_gog.py        # GOG OAuth connection and sync
 │   ├── collectors/gog.py    # GOG Galaxy API client and parser
+│   ├── routes_epic.py       # Epic Games OAuth connection and sync
+│   ├── collectors/epic.py   # Epic Games API client and parser
 │   ├── heartbeat.py         # Agent session lifecycle
 │   ├── stats.py             # Summary, daily, heatmap, top games
 │   ├── scheduler.py         # Background jobs
@@ -512,6 +541,8 @@ npm run build
   and can be revoked by disconnecting the account.
 - The GOG refresh token is stored in SQLite, masked in API responses, and can be
   revoked by disconnecting the account.
+- The Epic Games refresh token is stored in SQLite, masked in API responses, and
+  can be revoked by disconnecting the account.
 - The default `AGENT_API_KEY` is `change-me`; change it before exposing the
   service on a network.
 - `.env`, the SQLite database, and local build artifacts are excluded from Git.
@@ -530,6 +561,8 @@ npm run build
   session counts only; playtime and achievements are not available.
 - GOG support relies on an unofficial API and imports library and achievements
   only; playtime remains measured by the PC agent.
+- Epic Games support relies on an unofficial launcher API. Achievements are
+  partial, and playtime remains measured by the PC agent.
 - Restoring a backup replaces users, games, sessions, settings, and invalidates
   current login sessions.
 - InfluxDB exports are incremental and idempotent by point timestamp; changing

@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     xbox_client_id: str = ""
     ubisoft_sync_minutes: int = 60
     gog_sync_minutes: int = 60
+    epic_sync_minutes: int = 120
     igdb_enrich_limit: int = 8
     steam_achievement_limit: int = 8
     session_days: int = 7

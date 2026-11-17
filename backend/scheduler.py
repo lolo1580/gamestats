@@ -6,6 +6,7 @@ from datetime import timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
+from collectors.epic import sync_epic_library
 from collectors.gog import sync_gog_library
 from collectors.igdb import enrich_games
 from collectors.steam import sync_steam_library
@@ -98,6 +99,16 @@ def _gog_job() -> None:
         logger.exception("Échec de la synchronisation GOG.")
 
 
+def _epic_job() -> None:
+    try:
+        with SessionLocal() as db:
+            result = sync_epic_library(db)
+            if result.get("skipped"):
+                logger.debug("Sync Epic Games ignorée : %s", result.get("reason"))
+    except Exception:
+        logger.exception("Échec de la synchronisation Epic Games.")
+
+
 def start_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is not None:
@@ -158,17 +169,25 @@ def start_scheduler() -> BackgroundScheduler:
         name="Synchronisation GOG",
         next_run_time=utcnow() + timedelta(seconds=90),
     )
+    scheduler.add_job(
+        _epic_job,
+        IntervalTrigger(minutes=max(60, settings.epic_sync_minutes)),
+        id="sync-epic",
+        name="Synchronisation Epic Games",
+        next_run_time=utcnow() + timedelta(seconds=105),
+    )
 
     scheduler.start()
     _scheduler = scheduler
     logger.info(
-        "Planificateur démarré (Steam: %s min, IGDB: %s min, InfluxDB: %s min, Xbox: %s min, Ubisoft: %s min, GOG: %s min, configuration via /api/settings).",
+        "Planificateur démarré (Steam: %s min, IGDB: %s min, InfluxDB: %s min, Xbox: %s min, Ubisoft: %s min, GOG: %s min, Epic: %s min, configuration via /api/settings).",
         max(5, settings.steam_sync_minutes),
         max(15, settings.igdb_sync_minutes),
         max(5, settings.influx_export_minutes),
         max(10, settings.xbox_sync_minutes),
         max(15, settings.ubisoft_sync_minutes),
         max(30, settings.gog_sync_minutes),
+        max(60, settings.epic_sync_minutes),
     )
     return scheduler
 

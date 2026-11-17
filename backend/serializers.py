@@ -43,6 +43,9 @@ def game_payload(game: Game) -> dict:
         "gog_product_id": game.gog_product_id,
         "gog_achievements_total": game.gog_achievements_total or 0,
         "gog_achievements_unlocked": game.gog_achievements_unlocked or 0,
+        "epic_catalog_item_id": game.epic_catalog_item_id,
+        "epic_achievements_total": game.epic_achievements_total or 0,
+        "epic_achievements_unlocked": game.epic_achievements_unlocked or 0,
     }
 
 

@@ -60,6 +60,11 @@ export interface AppSettings {
   gog_username: string
   gog_connected: boolean
   gog_last_sync_at: string | null
+  epic_refresh_token_hint: string
+  epic_refresh_token_set: boolean
+  epic_display_name: string
+  epic_connected: boolean
+  epic_last_sync_at: string | null
 }
 
 export interface SettingsUpdatePayload {
@@ -123,6 +128,19 @@ export interface GogResult {
   message: string | null
 }
 
+export interface EpicAuthUrl {
+  url: string
+  redirect_uri: string
+}
+
+export interface EpicResult {
+  connected: boolean
+  name: string | null
+  games_synced: number | null
+  last_sync_at: string | null
+  message: string | null
+}
+
 export interface InfluxExportResult {
   skipped: boolean
   reason: string | null
@@ -155,6 +173,9 @@ export interface Game {
   gog_product_id: number | null
   gog_achievements_total: number
   gog_achievements_unlocked: number
+  epic_catalog_item_id: string | null
+  epic_achievements_total: number
+  epic_achievements_unlocked: number
 }
 
 export interface TopGame extends Game {

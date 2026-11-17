@@ -92,6 +92,9 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
   const [gogCode, setGogCode] = useState('')
   const [gogBusy, setGogBusy] = useState(false)
   const [gogAuthUrl, setGogAuthUrl] = useState<string | null>(null)
+  const [epicCode, setEpicCode] = useState('')
+  const [epicBusy, setEpicBusy] = useState(false)
+  const [epicAuthUrl, setEpicAuthUrl] = useState<string | null>(null)
 
   const [newUsername, setNewUsername] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -115,14 +118,16 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
     setLoading(true)
     setError(null)
     try {
-      const [nextSettings, nextUsers, gogAuth] = await Promise.all([
+      const [nextSettings, nextUsers, gogAuth, epicAuth] = await Promise.all([
         api.settings(),
         api.users(),
         api.gogAuthUrl().catch(() => null),
+        api.epicAuthUrl().catch(() => null),
       ])
       setSettings(nextSettings)
       setUsers(nextUsers)
       if (gogAuth) setGogAuthUrl(gogAuth.url)
+      if (epicAuth) setEpicAuthUrl(epicAuth.url)
       setTimezone(nextSettings.timezone)
       setSteamId(nextSettings.steam_id)
       setIgdbClientId(nextSettings.igdb_client_id)
@@ -488,6 +493,64 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       reportError(gogError)
     } finally {
       setGogBusy(false)
+    }
+  }
+
+  const connectEpic = async () => {
+    if (!epicCode.trim()) {
+      setError(t('settings.integrations.epicCodeHint'))
+      return
+    }
+    setEpicBusy(true)
+    setError(null)
+    try {
+      const result = await api.connectEpic(epicCode.trim())
+      setEpicCode('')
+      setSettings(await api.settings())
+      flash(
+        result.message ??
+          t('settings.integrations.epicSynced', {
+            games: result.games_synced ?? 0,
+          }),
+      )
+    } catch (epicError) {
+      reportError(epicError)
+    } finally {
+      setEpicBusy(false)
+    }
+  }
+
+  const syncEpicNow = async () => {
+    setEpicBusy(true)
+    setError(null)
+    try {
+      const result = await api.syncEpic()
+      setSettings(await api.settings())
+      flash(
+        result.message ??
+          t('settings.integrations.epicSynced', {
+            games: result.games_synced ?? 0,
+          }),
+      )
+    } catch (epicError) {
+      reportError(epicError)
+    } finally {
+      setEpicBusy(false)
+    }
+  }
+
+  const disconnectEpic = async () => {
+    if (!window.confirm(t('settings.integrations.epicDisconnectConfirm'))) return
+    setEpicBusy(true)
+    setError(null)
+    try {
+      await api.disconnectEpic()
+      setSettings(await api.settings())
+      flash(t('settings.integrations.epicNotConnected'))
+    } catch (epicError) {
+      reportError(epicError)
+    } finally {
+      setEpicBusy(false)
     }
   }
 
@@ -1350,6 +1413,112 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               </p>
             </div>
 
+            <div className="settings-group">
+              <div className="settings-group__head">
+                <h3>{t('settings.integrations.epic')}</h3>
+                <span
+                  className={`config-status${
+                    settings.epic_connected ? ' is-on' : ' is-off'
+                  }`}
+                >
+                  {settings.epic_connected
+                    ? t('settings.integrations.epicConnected')
+                    : t('settings.integrations.epicNotConnected')}
+                </span>
+              </div>
+              <p className="settings-hint">
+                {t('settings.integrations.epicSubtitle')}
+              </p>
+
+              {epicAuthUrl && (
+                <div className="settings-actions">
+                  <a
+                    className="button"
+                    href={epicAuthUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink size={14} strokeWidth={2} />
+                    {t('settings.integrations.epicOpenAuth')}
+                  </a>
+                </div>
+              )}
+
+              <label className="field">
+                <span>{t('settings.integrations.epicCode')}</span>
+                <textarea
+                  className="input"
+                  value={epicCode}
+                  onChange={(event) => setEpicCode(event.target.value)}
+                  placeholder='{"authorizationCode":"..."}'
+                  rows={2}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <small>{t('settings.integrations.epicCodeHint')}</small>
+              </label>
+
+              {settings.epic_connected && (
+                <div className="xbox-metrics">
+                  {settings.epic_display_name && (
+                    <span>
+                      Epic
+                      <strong>{settings.epic_display_name}</strong>
+                    </span>
+                  )}
+                  <span>
+                    {t('settings.integrations.epicLastSync')}
+                    <strong>
+                      {settings.epic_last_sync_at
+                        ? formatRelative(settings.epic_last_sync_at, lang)
+                        : t('common.never')}
+                    </strong>
+                  </span>
+                </div>
+              )}
+
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={connectEpic}
+                  disabled={epicBusy || !epicCode.trim()}
+                >
+                  <Globe2 size={14} strokeWidth={2} />
+                  {t('settings.integrations.epicConnect')}
+                </button>
+                {settings.epic_connected && (
+                  <>
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={syncEpicNow}
+                      disabled={epicBusy}
+                    >
+                      <RefreshCw
+                        size={14}
+                        strokeWidth={2}
+                        className={epicBusy ? 'is-spinning' : undefined}
+                      />
+                      {t('settings.integrations.epicSync')}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--danger"
+                      onClick={disconnectEpic}
+                      disabled={epicBusy}
+                    >
+                      {t('settings.integrations.epicDisconnect')}
+                    </button>
+                  </>
+                )}
+              </div>
+              <p className="settings-hint">
+                {t('settings.integrations.epicNoPlaytime')}{' '}
+                {t('settings.integrations.epicPartialAchievements')}
+              </p>
+            </div>
+
             <button type="submit" className="button button--primary" disabled={saving}>
               <Save size={15} strokeWidth={2} />
               {t('settings.integrations.save')}
@@ -1835,6 +2004,20 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               <code>GET /user/data/games · gameplay.gog.com achievements</code>
             </div>
             <p className="settings-hint">{t('settings.docs.gogHint')}</p>
+          </section>
+
+          <section className="panel settings-panel">
+            <header className="card-head">
+              <div>
+                <h2>{t('settings.docs.epicTitle')}</h2>
+                <p>{t('settings.docs.epicSubtitle')}</p>
+              </div>
+            </header>
+            <div className="docs-code">
+              <code>epicgames.com/id/login → authorizationCode → Settings → Integrations → Epic</code>
+              <code>library-service .../items · launcher.store.epicgames.com/graphql</code>
+            </div>
+            <p className="settings-hint">{t('settings.docs.epicHint')}</p>
           </section>
         </div>
       )}

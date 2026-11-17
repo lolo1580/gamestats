@@ -4,6 +4,7 @@ from datetime import timedelta
 import httpx
 
 import influx as influx_module
+from collectors import epic as epic_module
 from collectors import gog as gog_module
 from collectors import ubisoft as ubisoft_module
 from collectors import xbox as xbox_module
@@ -12,6 +13,8 @@ from collectors.xbox import parse_titles
 from database import SessionLocal
 from models import Game, GameSession, utcnow
 from settings_service import (
+    SETTING_EPIC_ACCOUNT_ID,
+    SETTING_EPIC_REFRESH_TOKEN,
     SETTING_GOG_REFRESH_TOKEN,
     SETTING_GOG_USER_ID,
     SETTING_UBISOFT_REMEMBER_ME_TICKET,
@@ -728,3 +731,136 @@ def test_gog_sync_maps_library(client, monkeypatch):
     assert settings["gog_connected"] is True
     assert settings["gog_username"] == "Gog Player"
     assert settings["gog_last_sync_at"] is not None
+def test_epic_extract_code():
+    from routes_epic import _extract_code
+
+    assert _extract_code("abc123def456") == "abc123def456"
+    assert (
+        _extract_code(
+            '{"warning":"x","authorizationCode":"auth-code-1","exchangeCode":null}'
+        )
+        == "auth-code-1"
+    )
+    assert (
+        _extract_code(
+            "https://www.epicgames.com/id/api/redirect?clientId=abc&code=url-code"
+        )
+        == "url-code"
+    )
+
+
+def test_epic_auth_url(client):
+    response = client.get("/api/epic/auth-url")
+    assert response.status_code == 200
+    body = response.json()
+    assert "epicgames.com/id/login" in body["url"]
+    assert "clientId=34a02cf8f4414e29b15921876da36f9a" in body["redirect_uri"]
+
+
+def test_epic_endpoints_without_connection(client):
+    sync = client.post("/api/epic/sync")
+    assert sync.status_code == 200
+    assert sync.json()["connected"] is False
+
+    settings = client.get("/api/settings").json()
+    assert settings["epic_connected"] is False
+    assert settings["epic_refresh_token_set"] is False
+
+    disconnect = client.post("/api/epic/disconnect")
+    assert disconnect.status_code == 200
+
+
+def test_epic_sync_maps_library(client, monkeypatch):
+    with SessionLocal() as db:
+        update_settings(
+            db,
+            {
+                SETTING_EPIC_REFRESH_TOKEN: "refresh-token",
+                SETTING_EPIC_ACCOUNT_ID: "account-1",
+            },
+        )
+
+    class FakeEpicClient:
+        def __init__(self, _refresh_token=""):
+            self.account_id = ""
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def refresh(self):
+            return {
+                "access_token": "access-token",
+                "refresh_token": "new-refresh-token",
+                "account_id": "account-1",
+                "displayName": "Epic Player",
+            }
+
+        def library_items(self, _access_token):
+            return [
+                {
+                    "namespace": "ns-aw2",
+                    "catalogItemId": "catalog-aw2",
+                    "appName": "AppAW2",
+                    "sandboxName": "AllenWake2",
+                    "sandboxType": "PUBLIC",
+                    "recordType": "APPLICATION",
+                },
+                {
+                    "namespace": "ns-aw2",
+                    "catalogItemId": "catalog-dlc",
+                    "appName": "AppAW2DLC",
+                    "sandboxName": "AllenWake2",
+                    "sandboxType": "PUBLIC",
+                    "recordType": "SUBSCRIPTION",
+                },
+                {
+                    "namespace": "ue",
+                    "catalogItemId": "catalog-ue",
+                    "appName": "MarketplacePlugin",
+                    "sandboxType": "PUBLIC",
+                    "recordType": "APPLICATION",
+                },
+            ]
+
+        def catalog_item(self, namespace, catalog_item_id, _access_token):
+            assert namespace == "ns-aw2"
+            assert catalog_item_id == "catalog-aw2"
+            return {
+                "title": "Alan Wake 2",
+                "keyImages": [
+                    {
+                        "type": "OfferImageTall",
+                        "url": "https://cdn.epicgames.com/aw2.jpg",
+                    }
+                ],
+            }
+
+        def achievements(self, namespace, _access_token):
+            assert namespace == "ns-aw2"
+            return 30, 12
+
+    monkeypatch.setattr(epic_module, "EpicClient", FakeEpicClient)
+
+    response = client.post("/api/epic/sync")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["connected"] is True
+    assert body["name"] == "Epic Player"
+    assert body["games_synced"] == 1
+
+    games = client.get("/api/games").json()
+    assert len(games) == 1
+    game = games[0]
+    assert game["name"] == "Alan Wake 2"
+    assert game["epic_catalog_item_id"] == "catalog-aw2"
+    assert game["epic_achievements_total"] == 30
+    assert game["epic_achievements_unlocked"] == 12
+    assert game["cover_url"] == "https://cdn.epicgames.com/aw2.jpg"
+
+    settings = client.get("/api/settings").json()
+    assert settings["epic_connected"] is True
+    assert settings["epic_display_name"] == "Epic Player"
+    assert settings["epic_last_sync_at"] is not None

@@ -139,21 +139,28 @@ export function Library({ games, loading }: LibraryProps) {
           {visibleGames.map((game) => {
             const hasSteamAchievements = game.achievements_total > 0
             const hasXboxAchievements = game.xbox_achievements_total > 0
+            const hasGogAchievements = game.gog_achievements_total > 0
             const achievementsTotal = hasSteamAchievements
               ? game.achievements_total
               : hasXboxAchievements
                 ? game.xbox_achievements_total
-                : game.gog_achievements_total
+                : hasGogAchievements
+                  ? game.gog_achievements_total
+                  : game.epic_achievements_total
             const achievementsUnlocked = hasSteamAchievements
               ? game.achievements_unlocked
               : hasXboxAchievements
                 ? game.xbox_achievements_unlocked
-                : game.gog_achievements_unlocked
+                : hasGogAchievements
+                  ? game.gog_achievements_unlocked
+                  : game.epic_achievements_unlocked
             const achievementsSource = hasSteamAchievements
               ? t('library.achievementsLabel')
               : hasXboxAchievements
                 ? t('library.achievementsXbox')
-                : t('library.achievementsGog')
+                : hasGogAchievements
+                  ? t('library.achievementsGog')
+                  : t('library.achievementsEpic')
             const progress =
               achievementsTotal > 0
                 ? Math.round((achievementsUnlocked / achievementsTotal) * 100)
@@ -163,11 +170,12 @@ export function Library({ games, loading }: LibraryProps) {
               <article key={game.id} className="game-card">
                 <div className="game-card__media">
                   <Cover src={game.cover_url} name={game.name} className="game-cover" />
-                  {(game.xbox_title_id || game.gog_product_id) && (
+                  {(game.xbox_title_id || game.gog_product_id || game.epic_catalog_item_id) && (
                     <span className="game-card__platform">
                       {[
                         game.xbox_title_id ? t('library.xboxBadge') : null,
                         game.gog_product_id ? t('library.gogBadge') : null,
+                        game.epic_catalog_item_id ? t('library.epicBadge') : null,
                       ]
                         .filter(Boolean)
                         .join(' · ')}

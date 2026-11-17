@@ -84,6 +84,11 @@ def _ensure_sqlite_columns() -> None:
         "gog_achievements_total": "INTEGER NOT NULL DEFAULT 0",
         "gog_achievements_unlocked": "INTEGER NOT NULL DEFAULT 0",
         "gog_achievements_checked_at": "DATETIME",
+        "epic_catalog_item_id": "VARCHAR(64)",
+        "epic_namespace": "VARCHAR(64)",
+        "epic_achievements_total": "INTEGER NOT NULL DEFAULT 0",
+        "epic_achievements_unlocked": "INTEGER NOT NULL DEFAULT 0",
+        "epic_achievements_checked_at": "DATETIME",
     }
     with engine.begin() as connection:
         for name, ddl in additions.items():
@@ -100,6 +105,10 @@ def _ensure_sqlite_columns() -> None:
         connection.exec_driver_sql(
             'CREATE UNIQUE INDEX IF NOT EXISTS "ix_games_gog_product_id" '
             'ON "games" ("gog_product_id")'
+        )
+        connection.exec_driver_sql(
+            'CREATE UNIQUE INDEX IF NOT EXISTS "ix_games_epic_catalog_item_id" '
+            'ON "games" ("epic_catalog_item_id")'
         )
 
 

@@ -98,6 +98,11 @@ class SettingsOut(BaseModel):
     gog_username: str
     gog_connected: bool
     gog_last_sync_at: str | None
+    epic_refresh_token_hint: str
+    epic_refresh_token_set: bool
+    epic_display_name: str
+    epic_connected: bool
+    epic_last_sync_at: str | None
 
 
 class SettingsUpdate(BaseModel):
@@ -185,6 +190,23 @@ class GogOut(BaseModel):
     message: str | None = None
 
 
+class EpicConnectIn(BaseModel):
+    code: str = Field(min_length=8, max_length=8192)
+
+
+class EpicAuthUrlOut(BaseModel):
+    url: str
+    redirect_uri: str
+
+
+class EpicOut(BaseModel):
+    connected: bool
+    name: str | None = None
+    games_synced: int | None = None
+    last_sync_at: str | None = None
+    message: str | None = None
+
+
 class HeartbeatGameIn(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     process: str | None = Field(default=None, max_length=255)
@@ -235,6 +257,9 @@ class GameOut(BaseModel):
     gog_product_id: int | None
     gog_achievements_total: int
     gog_achievements_unlocked: int
+    epic_catalog_item_id: str | None
+    epic_achievements_total: int
+    epic_achievements_unlocked: int
 
 
 class TopGameOut(GameOut):

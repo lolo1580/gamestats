@@ -20,6 +20,7 @@ from models import Agent, User, utcnow
 from routes_auth import router as auth_router
 from routes_backup import router as backup_router
 from routes_gog import router as gog_router
+from routes_epic import router as epic_router
 from routes_homepage import router as homepage_router
 from routes_influx import router as influx_router
 from routes_settings import router as settings_router
@@ -87,7 +88,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="GameStats API",
-    version="1.5.0",
+    version="1.6.0",
     description="Suivi de sessions de jeu (agent PC + Steam) et statistiques.",
     lifespan=lifespan,
     docs_url=None,
@@ -112,6 +113,7 @@ app.include_router(influx_router)
 app.include_router(xbox_router)
 app.include_router(ubisoft_router)
 app.include_router(gog_router)
+app.include_router(epic_router)
 
 
 @app.get("/")
