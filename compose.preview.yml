@@ -1,8 +1,43 @@
+name: gamestats
+
+# Published preview images.
+# Start:   docker compose -f compose.preview.yml pull
+#          docker compose -f compose.preview.yml up -d
+#
+# Optional dated tag:
+#   GAMESTATS_IMAGE_TAG=preview-2026-11-17-1 \
+#     docker compose -f compose.preview.yml up -d
+#
+# This file is standalone. Do not combine it with compose.yml.
+# It uses the same .env file and ./data directory as the local build.
+
 services:
   backend:
     image: ghcr.io/lolo1580/gamestats-backend:${GAMESTATS_IMAGE_TAG:-preview-latest}
-    build: !reset null
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite:////data/gamestats.db
+    volumes:
+      - ./data:/data
+    ports:
+      - "${BACKEND_PORT:-8091}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   frontend:
     image: ghcr.io/lolo1580/gamestats-frontend:${GAMESTATS_IMAGE_TAG:-preview-latest}
-    build: !reset null
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8090}:80"
+    depends_on:
+      backend:
+        condition: service_healthy

@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/docker-preview.yml"
 
 permissions:
   contents: read

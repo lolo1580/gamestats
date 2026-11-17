@@ -62,6 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Ubisoft, GOG, Epic Games, and optional metadata providers.
 - The SQLite schema now migrates new platform and metadata columns on existing
   game tables.
+- Compose now loads backend settings directly from `.env`; `compose.preview.yml`
+  is a standalone file for the published GHCR images and uses the same data
+  directory.
 - Dashboard, library, sessions, stats, agents, user, and settings endpoints now
   require an authenticated session.
 - Admin sync/enrichment endpoints now require an administrator session instead

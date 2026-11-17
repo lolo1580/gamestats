@@ -1,34 +1,18 @@
 name: gamestats
 
+# Local build.
+# Start: docker compose up -d --build
+#
+# To run the published preview images instead, use compose.preview.yml.
+
 services:
   backend:
     build:
       context: ./backend
     restart: unless-stopped
+    env_file: .env
     environment:
       DATABASE_URL: sqlite:////data/gamestats.db
-      AGENT_API_KEY: ${AGENT_API_KEY:-change-me}
-      TIMEZONE: ${TIMEZONE:-Europe/Paris}
-      STEAM_API_KEY: ${STEAM_API_KEY:-}
-      STEAM_ID: ${STEAM_ID:-}
-      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
-      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
-      XBOX_CLIENT_ID: ${XBOX_CLIENT_ID:-}
-      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
-      AGENT_STALE_SECONDS: ${AGENT_STALE_SECONDS:-180}
-      STEAM_SYNC_MINUTES: ${STEAM_SYNC_MINUTES:-15}
-      IGDB_SYNC_MINUTES: ${IGDB_SYNC_MINUTES:-60}
-      INFLUX_EXPORT_MINUTES: ${INFLUX_EXPORT_MINUTES:-15}
-      XBOX_SYNC_MINUTES: ${XBOX_SYNC_MINUTES:-30}
-      UBISOFT_SYNC_MINUTES: ${UBISOFT_SYNC_MINUTES:-60}
-      GOG_SYNC_MINUTES: ${GOG_SYNC_MINUTES:-60}
-      EPIC_SYNC_MINUTES: ${EPIC_SYNC_MINUTES:-120}
-      METADATA_SYNC_MINUTES: ${METADATA_SYNC_MINUTES:-360}
-      METADATA_ENRICH_LIMIT: ${METADATA_ENRICH_LIMIT:-8}
-      OPENCRITIC_ENRICH_LIMIT: ${OPENCRITIC_ENRICH_LIMIT:-4}
-      SESSION_DAYS: ${SESSION_DAYS:-7}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - ./data:/data
     ports:

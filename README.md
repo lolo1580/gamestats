@@ -137,19 +137,28 @@ the GitHub package settings, or authenticate before pulling:
 echo "$GITHUB_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
 ```
 
-To run the published images instead of building locally, use the preview
-override (Docker Compose 2.24+ for `build: !reset`):
+There are two standalone Compose files:
+
+| Mode | Command |
+| --- | --- |
+| Local build | `docker compose up -d --build` |
+| Published preview images | `docker compose -f compose.preview.yml up -d` |
+
+`compose.preview.yml` uses the same `.env` file and `./data` directory as the
+local build. It is standalone: do not combine it with `compose.yml`.
+
+Pull the latest preview images before starting:
 
 ```bash
-docker compose -f compose.yml -f compose.preview.yml pull
-docker compose -f compose.yml -f compose.preview.yml up -d
+docker compose -f compose.preview.yml pull
+docker compose -f compose.preview.yml up -d
 ```
 
 Set `GAMESTATS_IMAGE_TAG` to use a dated tag:
 
 ```bash
 GAMESTATS_IMAGE_TAG=preview-2026-11-17-1 \
-  docker compose -f compose.yml -f compose.preview.yml up -d
+  docker compose -f compose.preview.yml up -d
 ```
 
 ## Configuration
