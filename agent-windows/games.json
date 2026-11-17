@@ -1,0 +1,57 @@
+{
+  "_comment": "Associez le nom du jeu aux exécutables détectés par psutil. Ajoutez vos propres jeux, puis relancez l'agent.",
+  "games": [
+    {
+      "name": "Counter-Strike 2",
+      "steam_app_id": 730,
+      "processes": ["cs2.exe"]
+    },
+    {
+      "name": "Dota 2",
+      "steam_app_id": 570,
+      "processes": ["dota2.exe"]
+    },
+    {
+      "name": "Elden Ring",
+      "steam_app_id": 1245620,
+      "processes": ["eldenring.exe"]
+    },
+    {
+      "name": "Baldur's Gate 3",
+      "steam_app_id": 1086940,
+      "processes": ["bg3.exe", "bg3_dx11.exe", "bg3_dx12.exe"]
+    },
+    {
+      "name": "Cyberpunk 2077",
+      "steam_app_id": 1091500,
+      "processes": ["cyberpunk2077.exe"]
+    },
+    {
+      "name": "Grand Theft Auto V",
+      "steam_app_id": 271590,
+      "processes": ["gta5.exe", "gtav.exe"]
+    },
+    {
+      "name": "Rocket League",
+      "steam_app_id": 252950,
+      "processes": ["rocketleague.exe"]
+    },
+    {
+      "name": "Apex Legends",
+      "steam_app_id": 1172470,
+      "processes": ["r5apex.exe", "r5apex_dx12.exe"]
+    },
+    {
+      "name": "League of Legends",
+      "processes": ["league of legends.exe"]
+    },
+    {
+      "name": "VALORANT",
+      "processes": ["valorant-win64-shipping.exe"]
+    },
+    {
+      "name": "Minecraft (Bedrock)",
+      "processes": ["minecraft.windows.exe"]
+    }
+  ]
+}
