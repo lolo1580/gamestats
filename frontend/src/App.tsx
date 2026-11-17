@@ -13,6 +13,8 @@ import type {
   Theme,
   TopGame,
 } from './types'
+import { useI18n } from './i18n'
+import type { TranslationKey } from './i18n'
 import { TopNav } from './components/TopNav'
 import { StatCards } from './components/StatCards'
 import { WeekChart } from './components/WeekChart'
@@ -25,30 +27,31 @@ import { Library } from './components/Library'
 import { SettingsPage } from './components/SettingsPage'
 import { AuthScreen } from './components/AuthScreen'
 
-const PAGE_META: Record<Page, { title: string; subtitle: string }> = {
+const PAGE_META: Record<Page, { title: TranslationKey; subtitle: TranslationKey }> = {
   overview: {
-    title: "Vue d'ensemble",
-    subtitle: 'Votre activité de jeu et les sessions récentes.',
+    title: 'page.overview.title',
+    subtitle: 'page.overview.subtitle',
   },
   library: {
-    title: 'Bibliothèque',
-    subtitle: 'Tous les jeux synchronisés depuis Steam et le suivi PC.',
+    title: 'page.library.title',
+    subtitle: 'page.library.subtitle',
   },
   sessions: {
-    title: 'Sessions',
-    subtitle: "L'historique complet des parties détectées.",
+    title: 'page.sessions.title',
+    subtitle: 'page.sessions.subtitle',
   },
   settings: {
-    title: 'Paramètres',
-    subtitle: 'Comptes, intégrations et documentation du backend.',
+    title: 'page.settings.title',
+    subtitle: 'page.settings.subtitle',
   },
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Erreur inconnue.'
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
 }
 
 export default function App() {
+  const { t, lang, setLang, hasStoredPreference } = useI18n()
   const [page, setPage] = useState<Page>('overview')
   const [theme, setTheme] = useState<Theme>(() =>
     document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
@@ -90,7 +93,7 @@ export default function App() {
       resetData()
       return true
     }
-    setError(errorMessage(apiError))
+    setError(errorMessage(apiError, t('settings.error')))
     return false
   }
 
@@ -103,9 +106,16 @@ export default function App() {
         setNeedsSetup(status.needs_setup)
         setCurrentUser(status.user)
         setAuthError(null)
+        if (
+          status.user &&
+          !hasStoredPreference &&
+          (status.user.locale === 'fr' || status.user.locale === 'en')
+        ) {
+          setLang(status.user.locale)
+        }
       })
       .catch((statusError: unknown) => {
-        if (active) setAuthError(errorMessage(statusError))
+        if (active) setAuthError(errorMessage(statusError, t('settings.error')))
       })
       .finally(() => {
         if (active) setAuthChecked(true)
@@ -113,6 +123,8 @@ export default function App() {
     return () => {
       active = false
     }
+    // The auth status is intentionally requested once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadDashboard = useCallback(async () => {
@@ -193,8 +205,8 @@ export default function App() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
-    document.title = `${PAGE_META[page].title} — GameStats`
-  }, [page])
+    document.title = `${t(PAGE_META[page].title)} — GameStats`
+  }, [page, t])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -208,11 +220,24 @@ export default function App() {
     }
   }, [theme])
 
+  useEffect(() => {
+    if (!currentUser || currentUser.locale === lang) return
+    api
+      .updateLocale(lang)
+      .then((updated) => setCurrentUser(updated))
+      .catch(() => {
+        // The local language still applies for this session.
+      })
+  }, [lang, currentUser])
+
   const handleAuthenticated = (user: CurrentUser) => {
     setCurrentUser(user)
     setNeedsSetup(false)
     setAuthError(null)
     setPage('overview')
+    if (!hasStoredPreference && (user.locale === 'fr' || user.locale === 'en')) {
+      setLang(user.locale)
+    }
   }
 
   const handleLogout = async () => {
@@ -246,7 +271,7 @@ export default function App() {
           <span className="loading-state__icon">
             <LoaderCircle size={22} strokeWidth={2.2} className="is-spinning" />
           </span>
-          <p>Connexion au backend…</p>
+          <p>{t('page.connecting')}</p>
         </div>
       </div>
     )
@@ -264,13 +289,16 @@ export default function App() {
     )
   }
 
-  const meta = PAGE_META[page]
+  const metaTitle = t(PAGE_META[page].title)
+  const metaSubtitle = t(PAGE_META[page].subtitle)
   const updatedLabel = lastUpdated
-    ? `Actualisé à ${lastUpdated.toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`
-    : 'Chargement…'
+    ? t('page.updated', {
+        time: lastUpdated.toLocaleTimeString(lang === 'fr' ? 'fr-FR' : 'en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      })
+    : t('page.loading')
 
   return (
     <div className="app">
@@ -290,8 +318,8 @@ export default function App() {
       <main className="app-main">
         <div className="page-head">
           <div>
-            <h1>{meta.title}</h1>
-            <p>{meta.subtitle}</p>
+            <h1>{metaTitle}</h1>
+            <p>{metaSubtitle}</p>
           </div>
           <span className="page-head__updated">{updatedLabel}</span>
         </div>
@@ -300,11 +328,11 @@ export default function App() {
           <div className="error-banner" role="alert">
             <AlertTriangle size={18} strokeWidth={2} />
             <div>
-              <strong>Impossible de joindre le backend.</strong>
+              <strong>{t('error.backendTitle')}</strong>
               <span>{error}</span>
             </div>
             <button type="button" onClick={handleRefresh} disabled={refreshing}>
-              Réessayer
+              {t('common.retry')}
             </button>
           </div>
         )}
@@ -316,7 +344,7 @@ export default function App() {
             <span className="loading-state__icon">
               <LoaderCircle size={22} strokeWidth={2.2} className="is-spinning" />
             </span>
-            <span>Chargement de votre activité…</span>
+            <span>{t('page.loadingActivity')}</span>
           </div>
         ) : !summary || !heatmap ? (
           <section className="panel">
@@ -324,8 +352,8 @@ export default function App() {
               <span className="empty-state__icon">
                 <WifiOff size={26} strokeWidth={1.7} />
               </span>
-              <strong>Backend indisponible</strong>
-              <p>Vérifiez que les conteneurs tournent, puis actualisez la page.</p>
+              <strong>{t('error.unavailableTitle')}</strong>
+              <p>{t('error.unavailableText')}</p>
             </div>
           </section>
         ) : page === 'overview' ? (
@@ -361,7 +389,7 @@ export default function App() {
         )}
 
         <footer className="app-footer">
-          <span>GameStats · auto-hébergé</span>
+          <span>{t('footer.selfHosted')}</span>
           <span>{updatedLabel}</span>
         </footer>
       </main>

@@ -17,9 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with masked secret values in API responses.
 - Agent key reveal and rotation from the settings UI.
 - Protected Swagger UI and ReDoc pages.
-- Settings interface with General, Integrations, Users, Account, and
+- Settings interface with General, Integrations, Users, Account, Backups, and
   Documentation sections.
 - User menu with account, settings, API documentation, and logout actions.
+- JSON and SQLite database backups with download and restore from the admin
+  settings page.
+- Snapshot validation, active-admin safeguard, and automatic session invalidation
+  after a restore.
+- French / English interface with a header language switch, localized dates,
+  numbers, and labels. Language preference is stored in the browser and on the
+  user account.
+- `PATCH /api/auth/me` support for updating the account locale.
 
 ### Changed
 
@@ -31,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are unconfigured, so settings changes apply without a restart.
 - Integration credentials and the agent key can be updated without restarting
   the backend.
+- Settings page now includes Backups and Documentation tabs.
 - README and changelog are maintained in English.
 
 ### Security
@@ -39,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Secure flag for HTTPS deployments.
 - Integration secrets are stored in SQLite and never returned unmasked.
 - Read endpoints are no longer public.
+- Backups contain password hashes and integration secrets and must be stored
+  securely.
 
 ## [1.0.0] - 2026-11-17
 

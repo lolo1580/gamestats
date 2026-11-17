@@ -3,7 +3,9 @@ import type { FormEvent } from 'react'
 import { Gamepad2 } from 'lucide-react'
 import { api, ApiError } from '../api'
 import type { CurrentUser, Theme } from '../types'
+import { useI18n } from '../i18n'
 import { ThemeToggle } from './ThemeToggle'
+import { LanguageToggle } from './LanguageToggle'
 
 interface AuthScreenProps {
   needsSetup: boolean
@@ -20,6 +22,7 @@ export function AuthScreen({
   onAuthenticated,
   initialError = null,
 }: AuthScreenProps) {
+  const { t } = useI18n()
   const [identifier, setIdentifier] = useState('')
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -34,11 +37,11 @@ export function AuthScreen({
 
     if (needsSetup) {
       if (password !== confirmPassword) {
-        setError('Les deux mots de passe ne correspondent pas.')
+        setError(t('auth.mismatch'))
         return
       }
       if (password.length < 8) {
-        setError('Le mot de passe doit contenir au moins 8 caractères.')
+        setError(t('auth.min8'))
         return
       }
     }
@@ -54,11 +57,17 @@ export function AuthScreen({
         : await api.login({ identifier, password })
       onAuthenticated(user)
     } catch (submitError) {
-      setError(
-        submitError instanceof ApiError
-          ? submitError.message
-          : 'Impossible de contacter le backend.',
-      )
+      if (submitError instanceof ApiError) {
+        if (submitError.status === 401) {
+          setError(t('auth.invalid'))
+        } else if (submitError.status === 409) {
+          setError(t('auth.setupDone'))
+        } else {
+          setError(submitError.message)
+        }
+      } else {
+        setError(t('auth.backendError'))
+      }
     } finally {
       setSubmitting(false)
     }
@@ -67,6 +76,7 @@ export function AuthScreen({
   return (
     <div className="auth-page">
       <div className="auth-page__theme">
+        <LanguageToggle />
         <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
       </div>
 
@@ -79,20 +89,18 @@ export function AuthScreen({
         </div>
 
         <span className="auth-eyebrow">
-          {needsSetup ? 'Première installation' : 'Espace privé'}
+          {needsSetup ? t('auth.setup.eyebrow') : t('auth.login.eyebrow')}
         </span>
-        <h1>{needsSetup ? 'Créez votre compte administrateur.' : 'Connexion.'}</h1>
+        <h1>{needsSetup ? t('auth.setup.title') : t('auth.login.title')}</h1>
         <p className="auth-intro">
-          {needsSetup
-            ? 'Ce compte administre le backend, les intégrations et les autres utilisateurs.'
-            : 'Connectez-vous pour accéder à vos statistiques de jeu.'}
+          {needsSetup ? t('auth.setup.intro') : t('auth.login.intro')}
         </p>
 
         <form className="auth-form" onSubmit={submit}>
           {needsSetup ? (
             <>
               <label className="field">
-                <span>Nom d'utilisateur</span>
+                <span>{t('auth.username')}</span>
                 <input
                   className="input"
                   autoComplete="username"
@@ -101,24 +109,24 @@ export function AuthScreen({
                   required
                   minLength={3}
                   pattern="[A-Za-z0-9_.-]{3,64}"
-                  placeholder="laurent"
+                  placeholder={t('auth.usernamePlaceholder')}
                 />
               </label>
               <label className="field">
-                <span>Email (optionnel)</span>
+                <span>{t('auth.email')}</span>
                 <input
                   className="input"
                   type="email"
                   autoComplete="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="vous@exemple.fr"
+                  placeholder={t('auth.emailPlaceholder')}
                 />
               </label>
             </>
           ) : (
             <label className="field">
-              <span>Identifiant ou email</span>
+              <span>{t('auth.identifier')}</span>
               <input
                 className="input"
                 autoComplete="username"
@@ -126,13 +134,13 @@ export function AuthScreen({
                 onChange={(event) => setIdentifier(event.target.value)}
                 required
                 autoFocus
-                placeholder="laurent"
+                placeholder={t('auth.identifierPlaceholder')}
               />
             </label>
           )}
 
           <label className="field">
-            <span>Mot de passe</span>
+            <span>{t('auth.password')}</span>
             <input
               className="input"
               type="password"
@@ -141,13 +149,13 @@ export function AuthScreen({
               onChange={(event) => setPassword(event.target.value)}
               required
               minLength={needsSetup ? 8 : undefined}
-              placeholder="8 caractères minimum"
+              placeholder={t('auth.passwordPlaceholder')}
             />
           </label>
 
           {needsSetup && (
             <label className="field">
-              <span>Confirmer le mot de passe</span>
+              <span>{t('auth.confirm')}</span>
               <input
                 className="input"
                 type="password"
@@ -162,18 +170,20 @@ export function AuthScreen({
 
           {error && <div className="auth-error">{error}</div>}
 
-          <button type="submit" className="button button--primary auth-submit" disabled={submitting}>
+          <button
+            type="submit"
+            className="button button--primary auth-submit"
+            disabled={submitting}
+          >
             {submitting
-              ? 'Veuillez patienter…'
+              ? t('auth.pleaseWait')
               : needsSetup
-                ? "Créer le compte admin"
-                : 'Se connecter'}
+                ? t('auth.createAdmin')
+                : t('auth.signIn')}
           </button>
         </form>
 
-        <footer className="auth-footer">
-          GameStats · auto-hébergé · vos données restent locales
-        </footer>
+        <footer className="auth-footer">{t('auth.footer')}</footer>
       </main>
     </div>
   )

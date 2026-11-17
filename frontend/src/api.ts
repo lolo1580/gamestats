@@ -26,12 +26,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const isFormData = init.body instanceof FormData
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: 'include',
     headers: {
       Accept: 'application/json',
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(init.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
       ...init.headers,
     },
   })
@@ -76,6 +77,45 @@ function del<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'DELETE' })
 }
 
+async function download(path: string): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+    headers: { Accept: 'application/octet-stream, application/json' },
+  })
+  if (!response.ok) {
+    let detail = `Erreur ${response.status}`
+    try {
+      const body = (await response.json()) as { detail?: string }
+      if (body.detail) detail = body.detail
+    } catch {
+      // Ignore non-JSON errors.
+    }
+    throw new ApiError(detail, response.status)
+  }
+  const disposition = response.headers.get('content-disposition') ?? ''
+  const match = /filename="?([^";]+)"?/i.exec(disposition)
+  return {
+    blob: await response.blob(),
+    filename: match?.[1] ?? 'gamestats-backup',
+  }
+}
+
+function uploadBackup(
+  format: 'json' | 'sqlite',
+  file: File,
+): Promise<{ ok: boolean; message: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  const path =
+    format === 'json'
+      ? '/admin/backup/import/json'
+      : '/admin/backup/restore/sqlite'
+  return request<{ ok: boolean; message: string }>(path, {
+    method: 'POST',
+    body: form,
+  })
+}
+
 export const docsLinks = {
   swagger: import.meta.env.DEV ? 'http://localhost:8000/docs' : '/docs',
   redoc: import.meta.env.DEV ? 'http://localhost:8000/redoc' : '/redoc',
@@ -93,6 +133,8 @@ export const api = {
     post<CurrentUser>('/auth/login', payload),
   logout: () => post<{ ok: boolean }>('/auth/logout'),
   me: () => get<CurrentUser>('/auth/me'),
+  updateLocale: (locale: 'fr' | 'en') =>
+    patch<CurrentUser>('/auth/me', { locale }),
   changePassword: (payload: { current_password: string; new_password: string }) =>
     post<{ ok: boolean }>('/auth/password', payload),
 
@@ -128,4 +170,9 @@ export const api = {
     patch<AppSettings>('/settings', payload),
   revealAgentKey: () => get<{ agent_api_key: string }>('/settings/agent-key'),
   rotateAgentKey: () => post<{ agent_api_key: string }>('/settings/agent-key/rotate'),
+
+  downloadBackup: (format: 'json' | 'sqlite') =>
+    download(`/admin/backup/export/${format}`),
+  restoreBackup: (format: 'json' | 'sqlite', file: File) =>
+    uploadBackup(format, file),
 }

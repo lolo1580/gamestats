@@ -12,6 +12,7 @@ from schemas import (
     AuthStatusOut,
     LoginIn,
     PasswordChangeIn,
+    ProfileUpdateIn,
     SetupIn,
     UserOut,
 )
@@ -149,6 +150,19 @@ def logout(
 
 @router.get("/me", response_model=UserOut)
 def me(user: CurrentUser) -> User:
+    return user
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    payload: ProfileUpdateIn,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> User:
+    if payload.locale is not None:
+        user.locale = payload.locale
+        db.commit()
+        db.refresh(user)
     return user
 
 

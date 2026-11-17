@@ -1,6 +1,7 @@
 import { ArrowRight, History } from 'lucide-react'
 import type { GameSession } from '../types'
 import { formatDuration, formatSessionStart } from '../format'
+import { useI18n } from '../i18n'
 import { Cover } from './Cover'
 
 interface RecentSessionsProps {
@@ -9,15 +10,17 @@ interface RecentSessionsProps {
 }
 
 export function RecentSessions({ sessions, onViewAll }: RecentSessionsProps) {
+  const { t, lang } = useI18n()
+
   return (
     <section className="panel table-panel">
       <header className="card-head">
         <div>
-          <h2>Sessions récentes</h2>
-          <p>Dernières parties détectées</p>
+          <h2>{t('recent.title')}</h2>
+          <p>{t('recent.subtitle')}</p>
         </div>
         <button type="button" className="text-link" onClick={onViewAll}>
-          Tout voir
+          {t('recent.viewAll')}
           <ArrowRight size={13} strokeWidth={2.2} />
         </button>
       </header>
@@ -27,17 +30,17 @@ export function RecentSessions({ sessions, onViewAll }: RecentSessionsProps) {
           <span className="empty-state__icon">
             <History size={24} strokeWidth={1.7} />
           </span>
-          <strong>Pas encore de session</strong>
-          <p>Configure l'agent Windows pour démarrer le suivi en temps réel.</p>
+          <strong>{t('recent.emptyTitle')}</strong>
+          <p>{t('recent.emptyText')}</p>
         </div>
       ) : (
         <div className="data-table">
           <div className="data-table__head" aria-hidden="true">
-            <span>Jeu</span>
-            <span>Début</span>
-            <span>Durée</span>
-            <span>Source</span>
-            <span>Statut</span>
+            <span>{t('table.game')}</span>
+            <span>{t('table.start')}</span>
+            <span>{t('table.duration')}</span>
+            <span>{t('table.source')}</span>
+            <span>{t('table.status')}</span>
           </div>
 
           {sessions.map((session) => (
@@ -53,19 +56,25 @@ export function RecentSessions({ sessions, onViewAll }: RecentSessionsProps) {
                 />
                 <div className="table-game__copy">
                   <h3 title={session.game_name}>{session.game_name}</h3>
-                  <span>{session.source === 'steam' ? 'Steam' : 'Agent PC'}</span>
+                  <span>
+                    {session.source === 'steam' ? t('source.steam') : t('agent.pc')}
+                  </span>
                 </div>
               </div>
-              <span className="table-date">{formatSessionStart(session.started_at)}</span>
-              <span className="table-duration">{formatDuration(session.duration_seconds)}</span>
+              <span className="table-date">
+                {formatSessionStart(session.started_at, lang)}
+              </span>
+              <span className="table-duration">
+                {formatDuration(session.duration_seconds, lang)}
+              </span>
               <span>
                 <span className={`source-badge source-badge--${session.source}`}>
-                  {session.source === 'steam' ? 'Steam' : 'PC'}
+                  {session.source === 'steam' ? t('source.steam') : t('source.pc')}
                 </span>
               </span>
               <span className={`table-status${session.is_live ? ' is-live' : ''}`}>
                 <span className="table-status__dot" />
-                {session.is_live ? 'En cours' : 'Terminée'}
+                {session.is_live ? t('status.inProgress') : t('status.finished')}
               </span>
             </div>
           ))}

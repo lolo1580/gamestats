@@ -1,13 +1,8 @@
 import { useMemo, useState } from 'react'
 import { History, Radio, Search } from 'lucide-react'
 import type { GameSession } from '../types'
-import {
-  formatDayLabel,
-  formatDuration,
-  formatSessionTime,
-  localDateKey,
-  pluralize,
-} from '../format'
+import { formatDayLabel, formatDuration, formatSessionTime, localDateKey } from '../format'
+import { useI18n } from '../i18n'
 import { Cover } from './Cover'
 
 interface SessionsPageProps {
@@ -18,6 +13,7 @@ interface SessionsPageProps {
 type SourceFilter = 'all' | 'agent' | 'steam'
 
 export function SessionsPage({ sessions, loading }: SessionsPageProps) {
+  const { t, lang } = useI18n()
   const [filter, setFilter] = useState<SourceFilter>('all')
   const [search, setSearch] = useState('')
 
@@ -37,13 +33,15 @@ export function SessionsPage({ sessions, loading }: SessionsPageProps) {
   const liveCount = sessions.filter((session) => session.is_live).length
 
   const filtered = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase('fr')
+    const term = search.trim().toLocaleLowerCase(lang === 'fr' ? 'fr' : 'en')
     return sessions.filter((session) => {
       if (filter !== 'all' && session.source !== filter) return false
-      if (term && !session.game_name.toLocaleLowerCase('fr').includes(term)) return false
+      if (term && !session.game_name.toLocaleLowerCase(lang === 'fr' ? 'fr' : 'en').includes(term)) {
+        return false
+      }
       return true
     })
-  }, [sessions, filter, search])
+  }, [sessions, filter, search, lang])
 
   const groups = useMemo(() => {
     const map = new Map<string, GameSession[]>()
@@ -56,49 +54,49 @@ export function SessionsPage({ sessions, loading }: SessionsPageProps) {
     return Array.from(map.entries())
   }, [filtered])
 
+  const filterOptions: { value: SourceFilter; label: string }[] = [
+    { value: 'all', label: t('sessions.filtersAll') },
+    { value: 'agent', label: t('sessions.filtersAgent') },
+    { value: 'steam', label: t('sessions.filtersSteam') },
+  ]
+
   return (
     <div className="page-stack">
-      <section className="stats-strip" aria-label="Résumé des sessions">
+      <section className="stats-strip" aria-label={t('sessions.loaded')}>
         <div className="stats-strip__item">
-          <span>Sessions chargées</span>
+          <span>{t('sessions.loaded')}</span>
           <strong>{sessions.length}</strong>
-          <small>100 dernières maximum</small>
+          <small>{t('sessions.max100')}</small>
         </div>
         <div className="stats-strip__item">
-          <span>Temps cumulé</span>
-          <strong>{formatDuration(totalSeconds)}</strong>
-          <small>sur les sessions affichées</small>
+          <span>{t('sessions.totalTime')}</span>
+          <strong>{formatDuration(totalSeconds, lang)}</strong>
+          <small>{t('sessions.displayedHint')}</small>
         </div>
         <div className="stats-strip__item">
-          <span>En direct</span>
+          <span>{t('sessions.live')}</span>
           <strong className="inline-live">
             {liveCount > 0 && <span className="live-dot" />}
-            {liveCount > 0 ? pluralize(liveCount, 'jeu', 'jeux') : 'Aucun'}
+            {liveCount > 0
+              ? t('status.gamesInProgress', { count: liveCount })
+              : t('sessions.none')}
           </strong>
-          <small>
-            {counts.agent} PC · {counts.steam} Steam
-          </small>
+          <small>{t('sessions.pcSteam', { pc: counts.agent, steam: counts.steam })}</small>
         </div>
       </section>
 
       <section className="panel sessions-panel">
         <div className="toolbar-row">
-          <div className="segmented" role="group" aria-label="Filtrer par source">
-            {(
-              [
-                ['all', 'Toutes'],
-                ['agent', 'Agent PC'],
-                ['steam', 'Steam'],
-              ] as const
-            ).map(([value, label]) => (
+          <div className="segmented" role="group" aria-label={t('sessions.filtersAll')}>
+            {filterOptions.map((option) => (
               <button
-                key={value}
+                key={option.value}
                 type="button"
-                className={`segmented__button${filter === value ? ' is-active' : ''}`}
-                onClick={() => setFilter(value)}
+                className={`segmented__button${filter === option.value ? ' is-active' : ''}`}
+                onClick={() => setFilter(option.value)}
               >
-                {label}
-                <span>{counts[value]}</span>
+                {option.label}
+                <span>{counts[option.value]}</span>
               </button>
             ))}
           </div>
@@ -107,16 +105,16 @@ export function SessionsPage({ sessions, loading }: SessionsPageProps) {
             <Search size={15} strokeWidth={2} />
             <input
               type="search"
-              placeholder="Rechercher un jeu…"
+              placeholder={t('sessions.search')}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              aria-label="Rechercher dans les sessions"
+              aria-label={t('sessions.search')}
             />
           </label>
         </div>
 
         {loading ? (
-          <div className="skeleton-list" aria-label="Chargement des sessions">
+          <div className="skeleton-list" aria-label={t('page.loading')}>
             {Array.from({ length: 6 }, (_, index) => (
               <span key={index} className="skeleton-row" />
             ))}
@@ -126,11 +124,11 @@ export function SessionsPage({ sessions, loading }: SessionsPageProps) {
             <span className="empty-state__icon">
               <History size={26} strokeWidth={1.7} />
             </span>
-            <strong>Aucune session trouvée</strong>
+            <strong>{t('sessions.emptyTitle')}</strong>
             <p>
               {sessions.length === 0
-                ? "L'historique se remplira dès qu'un jeu sera détecté."
-                : 'Essaie un autre filtre ou un autre titre.'}
+                ? t('sessions.emptyText')
+                : t('sessions.noResultsText')}
             </p>
           </div>
         ) : (
@@ -143,8 +141,8 @@ export function SessionsPage({ sessions, loading }: SessionsPageProps) {
               return (
                 <section key={dateKey} className="day-group">
                   <header className="day-group__head">
-                    <h3>{formatDayLabel(dateKey)}</h3>
-                    <span>{formatDuration(daySeconds)}</span>
+                    <h3>{formatDayLabel(dateKey, lang)}</h3>
+                    <span>{formatDuration(daySeconds, lang)}</span>
                   </header>
 
                   <div className="history-table">
@@ -161,26 +159,35 @@ export function SessionsPage({ sessions, loading }: SessionsPageProps) {
                           />
                           <div>
                             <h4 title={session.game_name}>{session.game_name}</h4>
-                            <span>{session.is_live ? 'En cours' : 'Partie terminée'}</span>
+                            <span>
+                              {session.is_live
+                                ? t('status.inProgress')
+                                : t('status.finished')}
+                            </span>
                           </div>
                         </div>
                         <span className="history-time">
-                          {formatSessionTime(session.started_at)}
+                          {formatSessionTime(session.started_at, lang)}
                         </span>
                         <span className={`source-badge source-badge--${session.source}`}>
-                          {session.source === 'steam' ? 'Steam' : 'PC'}
+                          {session.source === 'steam' ? t('source.steam') : t('source.pc')}
                         </span>
                         <span className="history-duration">
-                          {formatDuration(session.duration_seconds)}
+                          {formatDuration(session.duration_seconds, lang)}
                         </span>
                         <span className={`history-status${session.is_live ? ' is-live' : ''}`}>
                           {session.is_live ? (
                             <>
                               <Radio size={12} strokeWidth={2} />
-                              En cours
+                              {t('status.inProgress')}
                             </>
                           ) : (
-                            'Terminée'
+                            t('sessions.endedAt', {
+                              time: formatSessionTime(
+                                session.ended_at ?? session.started_at,
+                                lang,
+                              ),
+                            })
                           )}
                         </span>
                       </article>

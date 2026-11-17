@@ -1,6 +1,7 @@
 import { ArrowRight, Gamepad2, Trophy } from 'lucide-react'
 import type { TopGame } from '../types'
 import { formatDuration } from '../format'
+import { useI18n } from '../i18n'
 import { Cover } from './Cover'
 
 interface TopGamesProps {
@@ -10,17 +11,18 @@ interface TopGamesProps {
 }
 
 export function TopGames({ games, days, onBrowse }: TopGamesProps) {
+  const { t, lang } = useI18n()
   const max = Math.max(games[0]?.tracked_seconds ?? 0, 1)
 
   return (
     <section className="panel top-panel">
       <header className="card-head">
         <div>
-          <h2>Top jeux</h2>
-          <p>Temps suivi sur {days} jours</p>
+          <h2>{t('top.title')}</h2>
+          <p>{t('top.subtitle', { days })}</p>
         </div>
         <button type="button" className="text-link" onClick={onBrowse}>
-          Bibliothèque
+          {t('top.browse')}
           <ArrowRight size={13} strokeWidth={2.2} />
         </button>
       </header>
@@ -30,8 +32,8 @@ export function TopGames({ games, days, onBrowse }: TopGamesProps) {
           <span className="empty-state__icon">
             <Gamepad2 size={24} strokeWidth={1.7} />
           </span>
-          <strong>Aucune session sur la période</strong>
-          <p>Les jeux apparaîtront ici après le lancement de l'agent.</p>
+          <strong>{t('top.emptyTitle')}</strong>
+          <p>{t('top.emptyText')}</p>
         </div>
       ) : (
         <ol className="top-list">
@@ -42,10 +44,10 @@ export function TopGames({ games, days, onBrowse }: TopGamesProps) {
               <div className="top-item__main">
                 <div className="top-item__line">
                   <h3 title={game.name}>{game.name}</h3>
-                  <span>{formatDuration(game.tracked_seconds)}</span>
+                  <span>{formatDuration(game.tracked_seconds, lang)}</span>
                 </div>
                 <div className="top-item__meta">
-                  <span>{game.genres.slice(0, 2).join(' · ') || 'Jeu PC'}</span>
+                  <span>{game.genres.slice(0, 2).join(' · ') || t('top.pcGame')}</span>
                   {game.achievements_total > 0 && (
                     <span className="top-item__achievements">
                       <Trophy size={11} strokeWidth={2.2} />

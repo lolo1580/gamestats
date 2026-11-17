@@ -5,7 +5,7 @@ Windows agent reports the games currently running, while the backend keeps a
 history of sessions, synchronizes Steam playtime and achievements, and fetches
 covers and genres from IGDB.
 
-The interface is currently in French and ships with **dark and light themes**.
+The interface ships in **French and English**, with **dark and light themes**.
 
 ## Features
 
@@ -23,10 +23,14 @@ The interface is currently in French and ships with **dark and light themes**.
 - **Library** — search, sort, inspect playtime and achievement progress.
 - **Light / dark theme** — switch from the header; the preference is stored in
   the browser and applied before the first render.
+- **French / English interface** — switch from the header; the preference is
+  stored in the browser and on the user account.
 - **Accounts and roles** — first-run admin setup, login/logout, local sessions,
   user management, and `admin` / `viewer` roles.
 - **Backend settings** — manage the agent key, timezone, Steam and IGDB
   credentials from the UI. Secrets are masked in responses.
+- **Backups** — export a readable JSON snapshot or a full SQLite database, then
+  restore either format from the settings page.
 - **Protected documentation** — Swagger UI and ReDoc require an authenticated
   session, just like the dashboard.
 - **Docker Compose** — backend, SQLite persistence, and an nginx-served frontend.
@@ -225,6 +229,7 @@ not be visible. Check the log file if nothing appears in the dashboard.
 | `POST` | `/api/auth/login`         | Start a browser session                          |
 | `POST` | `/api/auth/logout`        | End the current session                          |
 | `GET`  | `/api/auth/me`            | Current user                                     |
+| `PATCH` | `/api/auth/me`           | Update locale preference                         |
 | `POST` | `/api/auth/password`      | Change your own password                         |
 | `GET`  | `/api/users`              | List users (admin)                               |
 | `POST` | `/api/users`              | Create a user (admin)                            |
@@ -234,6 +239,10 @@ not be visible. Check the log file if nothing appears in the dashboard.
 | `PATCH` | `/api/settings`           | Update integrations and timezone (admin)         |
 | `GET`  | `/api/settings/agent-key` | Reveal the agent key (admin)                     |
 | `POST` | `/api/settings/agent-key/rotate` | Rotate the agent key (admin)              |
+| `GET`  | `/api/admin/backup/export/json`  | Download a JSON backup (admin)            |
+| `GET`  | `/api/admin/backup/export/sqlite`| Download a SQLite backup (admin)          |
+| `POST` | `/api/admin/backup/import/json`  | Restore a JSON backup (admin)             |
+| `POST` | `/api/admin/backup/restore/sqlite` | Restore a SQLite backup (admin)         |
 | `POST` | `/api/admin/sync/steam`   | Force a Steam sync (admin session)               |
 | `POST` | `/api/admin/enrich/igdb`  | Force IGDB enrichment (admin session)            |
 
@@ -270,6 +279,7 @@ gamestats/
 │   ├── routes_auth.py       # Setup, login, logout, account
 │   ├── routes_users.py      # User management
 │   ├── routes_settings.py   # Integration settings
+│   ├── routes_backup.py     # JSON/SQLite backup and restore
 │   ├── heartbeat.py         # Agent session lifecycle
 │   ├── stats.py             # Summary, daily, heatmap, top games
 │   ├── scheduler.py         # Background jobs
@@ -347,7 +357,8 @@ npm run build
   SQLite, and sent in an HttpOnly, SameSite=Lax cookie.
 - Set `COOKIE_SECURE=true` when the app is served over HTTPS.
 - Integration secrets are stored in SQLite and masked in API responses. Protect
-  the `data` directory and backups accordingly.
+  the `data` directory and backups accordingly. Backups include password hashes
+  and integration secrets; store them securely.
 - The default `AGENT_API_KEY` is `change-me`; change it before exposing the
   service on a network.
 - `.env`, the SQLite database, and local build artifacts are excluded from Git.
@@ -360,7 +371,8 @@ npm run build
   To start over, stop the stack and remove the `data` directory.
 - The current design targets a single PC agent. Multiple agents reporting the
   same game create separate sessions.
-- The interface language is French; the code and documentation are in English.
+- Restoring a backup replaces users, games, sessions, settings, and invalidates
+  current login sessions.
 
 ## Changelog
 

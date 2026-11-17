@@ -18,6 +18,7 @@ from database import SessionLocal, get_db, init_db
 from heartbeat import process_heartbeat
 from models import Agent, User, utcnow
 from routes_auth import router as auth_router
+from routes_backup import router as backup_router
 from routes_settings import router as settings_router
 from routes_users import router as users_router
 from scheduler import start_scheduler, stop_scheduler
@@ -100,6 +101,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(settings_router)
+app.include_router(backup_router)
 
 
 @app.get("/")

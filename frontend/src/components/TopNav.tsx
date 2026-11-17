@@ -11,8 +11,11 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { AgentInfo, CurrentUser, Page, Summary, Theme } from '../types'
-import { initials, pluralize } from '../format'
+import { initials } from '../format'
+import { useI18n } from '../i18n'
+import type { TranslationKey } from '../i18n'
 import { ThemeToggle } from './ThemeToggle'
+import { LanguageToggle } from './LanguageToggle'
 import { docsLinks } from '../api'
 
 interface TopNavProps {
@@ -30,14 +33,14 @@ interface TopNavProps {
 
 interface NavItem {
   id: Page
-  label: string
+  labelKey: TranslationKey
   icon: LucideIcon
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
-  { id: 'library', label: 'Bibliothèque', icon: LibraryBig },
-  { id: 'sessions', label: 'Sessions', icon: History },
+  { id: 'overview', labelKey: 'nav.overview', icon: LayoutDashboard },
+  { id: 'library', labelKey: 'nav.library', icon: LibraryBig },
+  { id: 'sessions', labelKey: 'nav.sessions', icon: History },
 ]
 
 export function TopNav({
@@ -52,15 +55,16 @@ export function TopNav({
   currentUser,
   onLogout,
 }: TopNavProps) {
+  const { t } = useI18n()
   const onlineAgents = agents.filter((agent) => agent.online)
   const active = summary?.active_count ?? 0
   const isOnline = active > 0 || onlineAgents.length > 0
   const statusLabel =
     active > 0
-      ? `${pluralize(active, 'jeu', 'jeux')} en cours`
+      ? t('status.gamesInProgress', { count: active })
       : onlineAgents.length > 0
-        ? 'Agent en ligne'
-        : 'Hors ligne'
+        ? t('status.agentOnline')
+        : t('status.offline')
 
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -88,7 +92,7 @@ export function TopNav({
           type="button"
           className="brand"
           onClick={() => navigate('overview')}
-          aria-label="GameStats — vue d'ensemble"
+          aria-label={`GameStats — ${t('nav.overview')}`}
         >
           <span className="brand__logo">
             <Gamepad2 size={19} strokeWidth={2.2} />
@@ -96,7 +100,7 @@ export function TopNav({
           <span className="brand__name">GameStats</span>
         </button>
 
-        <nav className="header-nav" aria-label="Navigation principale">
+        <nav className="header-nav" aria-label={t('nav.overview')}>
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon
             return (
@@ -108,7 +112,7 @@ export function TopNav({
                 aria-current={page === item.id ? 'page' : undefined}
               >
                 <Icon size={15} strokeWidth={2} />
-                {item.label}
+                {t(item.labelKey)}
                 {item.id === 'library' && summary && summary.library_count > 0 && (
                   <span className="header-nav__count">{summary.library_count}</span>
                 )}
@@ -118,6 +122,7 @@ export function TopNav({
         </nav>
 
         <div className="header-actions">
+          <LanguageToggle />
           <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
 
           <span className={`status-pill${isOnline ? ' is-online' : ''}`}>
@@ -130,14 +135,14 @@ export function TopNav({
             className="button button--icon"
             onClick={onRefresh}
             disabled={refreshing}
-            aria-label="Actualiser les données"
+            aria-label={t('common.refresh')}
           >
             <RefreshCw
               size={16}
               strokeWidth={2}
               className={refreshing ? 'is-spinning' : undefined}
             />
-            <span className="button__label">Actualiser</span>
+            <span className="button__label">{t('common.refresh')}</span>
           </button>
 
           <div className="user-menu" ref={menuRef}>
@@ -157,8 +162,10 @@ export function TopNav({
               <div className="user-menu__dropdown" role="menu">
                 <div className="user-menu__header">
                   <strong>{currentUser.username}</strong>
-                  <span>{currentUser.email || 'Aucun email'}</span>
-                  <small>{currentUser.role === 'admin' ? 'Administrateur' : 'Lecteur'}</small>
+                  <span>{currentUser.email || t('menu.noEmail')}</span>
+                  <small>
+                    {currentUser.role === 'admin' ? t('menu.admin') : t('menu.viewer')}
+                  </small>
                 </div>
 
                 {currentUser.role === 'admin' && (
@@ -169,7 +176,7 @@ export function TopNav({
                     onClick={() => navigate('settings')}
                   >
                     <Settings size={15} strokeWidth={2} />
-                    Paramètres
+                    {t('menu.settings')}
                   </button>
                 )}
 
@@ -182,7 +189,7 @@ export function TopNav({
                   onClick={() => setMenuOpen(false)}
                 >
                   <span className="user-menu__item-icon">API</span>
-                  Documentation API
+                  {t('menu.apiDocs')}
                 </a>
 
                 <div className="user-menu__separator" />
@@ -197,7 +204,7 @@ export function TopNav({
                   }}
                 >
                   <LogOut size={15} strokeWidth={2} />
-                  Déconnexion
+                  {t('menu.logout')}
                 </button>
               </div>
             )}

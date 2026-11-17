@@ -1,4 +1,5 @@
 from datetime import timedelta
+import json
 
 from database import SessionLocal
 from models import Game, GameSession, utcnow
@@ -219,6 +220,71 @@ def test_settings_and_agent_key_rotation(client, agent_headers):
         headers={"X-Agent-Key": new_key},
     )
     assert accepted.status_code == 200
+
+
+def test_update_locale(client):
+    updated = client.patch("/api/auth/me", json={"locale": "en"})
+    assert updated.status_code == 200
+    assert updated.json()["locale"] == "en"
+    assert client.get("/api/auth/me").json()["locale"] == "en"
+
+
+def test_backup_json_roundtrip(client, admin_credentials):
+    exported = client.get("/api/admin/backup/export/json")
+    assert exported.status_code == 200
+    payload = exported.json()
+    assert payload["format"] == "gamestats-backup"
+    assert payload["version"] == 1
+    assert "users" in payload["tables"]
+    assert "games" in payload["tables"]
+    assert "auth_sessions" not in payload["tables"]
+
+    restored = client.post(
+        "/api/admin/backup/import/json",
+        files={
+            "file": (
+                "backup.json",
+                json.dumps(payload).encode("utf-8"),
+                "application/json",
+            )
+        },
+    )
+    assert restored.status_code == 200, restored.text
+
+    status = client.get("/api/auth/status").json()
+    assert status["authenticated"] is False
+    assert status["needs_setup"] is False
+
+    login = client.post(
+        "/api/auth/login",
+        json={"identifier": "admin", "password": admin_credentials["password"]},
+    )
+    assert login.status_code == 200
+
+
+def test_backup_sqlite_roundtrip(client, admin_credentials):
+    exported = client.get("/api/admin/backup/export/sqlite")
+    assert exported.status_code == 200
+    assert exported.content.startswith(b"SQLite format 3\x00")
+
+    restored = client.post(
+        "/api/admin/backup/restore/sqlite",
+        files={
+            "file": (
+                "backup.db",
+                exported.content,
+                "application/vnd.sqlite3",
+            )
+        },
+    )
+    assert restored.status_code == 200, restored.text
+    assert client.get("/api/auth/status").json()["authenticated"] is False
+
+    login = client.post(
+        "/api/auth/login",
+        json={"identifier": "admin", "password": admin_credentials["password"]},
+    )
+    assert login.status_code == 200
 
 
 def test_viewer_cannot_access_settings_or_users(anon_client, admin_credentials):

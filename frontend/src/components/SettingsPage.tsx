@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
+  AlertTriangle,
   BookOpen,
   Check,
   Copy,
+  Database,
+  Download,
   ExternalLink,
   Eye,
   EyeOff,
@@ -13,6 +16,7 @@ import {
   Server,
   Shield,
   Trash2,
+  Upload,
   UserPlus,
   Users,
   Wifi,
@@ -25,15 +29,14 @@ import type {
   UserRole,
 } from '../types'
 import { formatRelative } from '../format'
+import { useI18n } from '../i18n'
+import type { TranslationKey } from '../i18n'
 
-type SettingsTab = 'general' | 'integrations' | 'users' | 'account' | 'docs'
+type SettingsTab = 'general' | 'integrations' | 'users' | 'account' | 'backup' | 'docs'
+type BackupBusy = 'download-json' | 'download-sqlite' | 'upload-json' | 'upload-sqlite' | null
 
 interface SettingsPageProps {
   currentUser: CurrentUser
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof ApiError ? error.message : 'Une erreur est survenue.'
 }
 
 async function copyToClipboard(text: string): Promise<void> {
@@ -52,12 +55,15 @@ async function copyToClipboard(text: string): Promise<void> {
 }
 
 export function SettingsPage({ currentUser }: SettingsPageProps) {
+  const { t, lang } = useI18n()
   const [tab, setTab] = useState<SettingsTab>('general')
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [users, setUsers] = useState<CurrentUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [backupBusy, setBackupBusy] = useState<BackupBusy>(null)
 
   const [timezone, setTimezone] = useState('Europe/Paris')
   const [steamId, setSteamId] = useState('')
@@ -77,8 +83,12 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
   const [accountPassword, setAccountPassword] = useState('')
   const [accountConfirm, setAccountConfirm] = useState('')
 
-  const [saving, setSaving] = useState(false)
-  const [creatingUser, setCreatingUser] = useState(false)
+  const jsonInputRef = useRef<HTMLInputElement>(null)
+  const sqliteInputRef = useRef<HTMLInputElement>(null)
+
+  const reportError = (value: unknown) => {
+    setError(value instanceof ApiError ? value.message : t('settings.error'))
+  }
 
   const load = async () => {
     setLoading(true)
@@ -94,7 +104,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       setSteamId(nextSettings.steam_id)
       setIgdbClientId(nextSettings.igdb_client_id)
     } catch (loadError) {
-      setError(errorMessage(loadError))
+      reportError(loadError)
     } finally {
       setLoading(false)
     }
@@ -102,6 +112,8 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
 
   useEffect(() => {
     void load()
+    // Load once when the settings page is opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const flash = (text: string) => {
@@ -117,9 +129,9 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       const next = await api.updateSettings({ timezone })
       setSettings(next)
       setTimezone(next.timezone)
-      flash('Paramètres généraux enregistrés.')
+      flash(t('settings.savedGeneral'))
     } catch (saveError) {
-      setError(errorMessage(saveError))
+      reportError(saveError)
     } finally {
       setSaving(false)
     }
@@ -141,24 +153,24 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       setSettings(next)
       setSteamKey('')
       setIgdbSecret('')
-      flash('Intégrations enregistrées.')
+      flash(t('settings.integrations.saved'))
     } catch (saveError) {
-      setError(errorMessage(saveError))
+      reportError(saveError)
     } finally {
       setSaving(false)
     }
   }
 
   const clearSecret = async (field: 'steam_api_key' | 'igdb_client_secret') => {
-    if (!window.confirm('Supprimer ce secret ?')) return
+    if (!window.confirm(t('settings.integrations.confirmDelete'))) return
     setSaving(true)
     setError(null)
     try {
       const next = await api.updateSettings({ [field]: '' })
       setSettings(next)
-      flash('Secret supprimé.')
+      flash(t('settings.integrations.secretDeleted'))
     } catch (saveError) {
-      setError(errorMessage(saveError))
+      reportError(saveError)
     } finally {
       setSaving(false)
     }
@@ -173,7 +185,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       const result = await api.revealAgentKey()
       setRevealedAgentKey(result.agent_api_key)
     } catch (revealError) {
-      setError(errorMessage(revealError))
+      reportError(revealError)
     }
   }
 
@@ -182,30 +194,23 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       const key = revealedAgentKey ?? (await api.revealAgentKey()).agent_api_key
       setRevealedAgentKey(key)
       await copyToClipboard(key)
-      flash('Clé agent copiée.')
+      flash(t('settings.agent.copied'))
     } catch (copyError) {
-      setError(errorMessage(copyError))
+      reportError(copyError)
     }
   }
 
   const rotateAgentKey = async () => {
-    if (
-      !window.confirm(
-        "Générer une nouvelle clé ? L'agent devra être mis à jour immédiatement.",
-      )
-    ) {
-      return
-    }
+    if (!window.confirm(t('settings.agent.rotateConfirm'))) return
     setSaving(true)
     setError(null)
     try {
       const result = await api.rotateAgentKey()
       setRevealedAgentKey(result.agent_api_key)
-      const next = await api.settings()
-      setSettings(next)
-      flash("Nouvelle clé générée. Copiez-la dans l'agent.")
+      setSettings(await api.settings())
+      flash(t('settings.agent.rotated'))
     } catch (rotateError) {
-      setError(errorMessage(rotateError))
+      reportError(rotateError)
     } finally {
       setSaving(false)
     }
@@ -213,7 +218,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
 
   const createUser = async (event: FormEvent) => {
     event.preventDefault()
-    setCreatingUser(true)
+    setSaving(true)
     setError(null)
     try {
       await api.createUser({
@@ -227,11 +232,11 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       setNewPassword('')
       setNewRole('viewer')
       setUsers(await api.users())
-      flash('Utilisateur créé.')
+      flash(t('settings.users.created'))
     } catch (createError) {
-      setError(errorMessage(createError))
+      reportError(createError)
     } finally {
-      setCreatingUser(false)
+      setSaving(false)
     }
   }
 
@@ -243,21 +248,23 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
     try {
       await api.updateUser(id, payload)
       setUsers(await api.users())
-      flash('Utilisateur mis à jour.')
+      flash(t('settings.users.updated'))
     } catch (updateError) {
-      setError(errorMessage(updateError))
+      reportError(updateError)
     }
   }
 
   const deleteUser = async (user: CurrentUser) => {
-    if (!window.confirm(`Supprimer le compte « ${user.username} » ?`)) return
+    if (!window.confirm(t('settings.users.deleteConfirm', { username: user.username }))) {
+      return
+    }
     setError(null)
     try {
       await api.deleteUser(user.id)
       setUsers(await api.users())
-      flash('Utilisateur supprimé.')
+      flash(t('settings.users.deleted'))
     } catch (deleteError) {
-      setError(errorMessage(deleteError))
+      reportError(deleteError)
     }
   }
 
@@ -265,7 +272,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
     event.preventDefault()
     setError(null)
     if (accountPassword !== accountConfirm) {
-      setError('Les deux mots de passe ne correspondent pas.')
+      setError(t('settings.account.mismatch'))
       return
     }
     try {
@@ -276,18 +283,58 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       setCurrentPassword('')
       setAccountPassword('')
       setAccountConfirm('')
-      flash('Mot de passe modifié.')
+      flash(t('settings.account.changed'))
     } catch (passwordError) {
-      setError(errorMessage(passwordError))
+      reportError(passwordError)
     }
   }
 
-  const tabs: { id: SettingsTab; label: string; icon: typeof Users }[] = [
-    { id: 'general', label: 'Général', icon: Server },
-    { id: 'integrations', label: 'Intégrations', icon: Wifi },
-    { id: 'users', label: 'Utilisateurs', icon: Users },
-    { id: 'account', label: 'Mon compte', icon: Shield },
-    { id: 'docs', label: 'Documentation', icon: BookOpen },
+  const downloadBackup = async (format: 'json' | 'sqlite') => {
+    setBackupBusy(format === 'json' ? 'download-json' : 'download-sqlite')
+    setError(null)
+    try {
+      const { blob, filename } = await api.downloadBackup(format)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = filename
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+    } catch (downloadError) {
+      reportError(downloadError)
+    } finally {
+      setBackupBusy(null)
+    }
+  }
+
+  const restoreBackup = async (format: 'json' | 'sqlite', file: File | null) => {
+    if (!file) {
+      setError(t('settings.backup.noFile'))
+      return
+    }
+    if (!window.confirm(t('settings.backup.confirm'))) return
+    setBackupBusy(format === 'json' ? 'upload-json' : 'upload-sqlite')
+    setError(null)
+    try {
+      await api.restoreBackup(format, file)
+      window.alert(t('settings.backup.restored'))
+      window.location.reload()
+    } catch (restoreError) {
+      reportError(restoreError)
+    } finally {
+      setBackupBusy(null)
+    }
+  }
+
+  const tabs: { id: SettingsTab; labelKey: TranslationKey; icon: typeof Users }[] = [
+    { id: 'general', labelKey: 'settings.tabs.general', icon: Server },
+    { id: 'integrations', labelKey: 'settings.tabs.integrations', icon: Wifi },
+    { id: 'users', labelKey: 'settings.tabs.users', icon: Users },
+    { id: 'account', labelKey: 'settings.tabs.account', icon: Shield },
+    { id: 'backup', labelKey: 'settings.tabs.backup', icon: Database },
+    { id: 'docs', labelKey: 'settings.tabs.docs', icon: BookOpen },
   ]
 
   if (loading) {
@@ -296,14 +343,14 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
         <span className="loading-state__icon">
           <RefreshCw size={22} strokeWidth={2.2} className="is-spinning" />
         </span>
-        <span>Chargement des paramètres…</span>
+        <span>{t('settings.loading')}</span>
       </div>
     )
   }
 
   return (
     <div className="settings-page">
-      <div className="settings-tabs" role="tablist" aria-label="Sections des paramètres">
+      <div className="settings-tabs" role="tablist" aria-label={t('page.settings.title')}>
         {tabs.map((item) => {
           const Icon = item.icon
           return (
@@ -316,7 +363,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               onClick={() => setTab(item.id)}
             >
               <Icon size={15} strokeWidth={2} />
-              {item.label}
+              {t(item.labelKey)}
             </button>
           )
         })}
@@ -335,13 +382,13 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
           <section className="panel settings-panel">
             <header className="card-head">
               <div>
-                <h2>Général</h2>
-                <p>Fuseau horaire utilisé par les statistiques.</p>
+                <h2>{t('settings.general.title')}</h2>
+                <p>{t('settings.general.subtitle')}</p>
               </div>
             </header>
             <form className="settings-form" onSubmit={saveGeneral}>
               <label className="field">
-                <span>Fuseau horaire</span>
+                <span>{t('settings.timezone')}</span>
                 <input
                   className="input"
                   value={timezone}
@@ -349,11 +396,11 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                   placeholder="Europe/Paris"
                   required
                 />
-                <small>Exemple : Europe/Paris, Europe/London, America/New_York.</small>
+                <small>{t('settings.timezoneHint')}</small>
               </label>
               <button type="submit" className="button button--primary" disabled={saving}>
                 <Save size={15} strokeWidth={2} />
-                Enregistrer
+                {t('common.save')}
               </button>
             </form>
           </section>
@@ -361,24 +408,30 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
           <section className="panel settings-panel">
             <header className="card-head">
               <div>
-                <h2>Clé agent</h2>
-                <p>Secret utilisé par le tracker Windows pour envoyer les heartbeats.</p>
+                <h2>{t('settings.agent.title')}</h2>
+                <p>{t('settings.agent.subtitle')}</p>
               </div>
               <span
                 className={`config-status${settings.agent_api_key_set ? ' is-on' : ' is-off'}`}
               >
-                {settings.agent_api_key_set ? 'Configurée' : 'Absente'}
+                {settings.agent_api_key_set
+                  ? t('common.configuredF')
+                  : t('common.missingF')}
               </span>
             </header>
 
             <div className="agent-key">
-              <code>{revealedAgentKey ?? settings.agent_api_key_hint ?? 'Non définie'}</code>
+              <code>{revealedAgentKey ?? settings.agent_api_key_hint ?? '—'}</code>
               <button
                 type="button"
                 className="button button--icon"
                 onClick={revealAgentKey}
-                aria-label={revealedAgentKey ? 'Masquer la clé' : 'Afficher la clé'}
-                title={revealedAgentKey ? 'Masquer' : 'Afficher'}
+                aria-label={
+                  revealedAgentKey ? t('settings.agent.hide') : t('settings.agent.reveal')
+                }
+                title={
+                  revealedAgentKey ? t('settings.agent.hide') : t('settings.agent.reveal')
+                }
               >
                 {revealedAgentKey ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
@@ -386,8 +439,8 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                 type="button"
                 className="button button--icon"
                 onClick={copyAgentKey}
-                aria-label="Copier la clé"
-                title="Copier"
+                aria-label={t('settings.agent.copy')}
+                title={t('settings.agent.copy')}
               >
                 <Copy size={15} />
               </button>
@@ -401,11 +454,13 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                 disabled={saving}
               >
                 <RefreshCw size={14} strokeWidth={2} />
-                Régénérer la clé
+                {t('settings.agent.rotate')}
               </button>
             </div>
             <p className="settings-hint">
-              Endpoint de l'agent : <code>{window.location.origin}/api/heartbeat</code>
+              {t('settings.agent.endpoint', {
+                url: `${window.location.origin}/api/heartbeat`,
+              })}
             </p>
           </section>
         </div>
@@ -415,24 +470,26 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
         <section className="panel settings-panel">
           <header className="card-head">
             <div>
-              <h2>Intégrations</h2>
-              <p>Steam et IGDB. Les secrets sont masqués et ne sont jamais renvoyés en clair.</p>
+              <h2>{t('settings.integrations.title')}</h2>
+              <p>{t('settings.integrations.subtitle')}</p>
             </div>
           </header>
 
           <form className="settings-form" onSubmit={saveIntegrations}>
             <div className="settings-group">
               <div className="settings-group__head">
-                <h3>Steam</h3>
+                <h3>{t('settings.integrations.steam')}</h3>
                 <span
                   className={`config-status${settings.steam_configured ? ' is-on' : ' is-off'}`}
                 >
-                  {settings.steam_configured ? 'Configuré' : 'Non configuré'}
+                  {settings.steam_configured
+                    ? t('common.configured')
+                    : t('common.notConfigured')}
                 </span>
               </div>
               <div className="form-grid">
                 <label className="field">
-                  <span>Clé API Steam</span>
+                  <span>{t('settings.integrations.steamKey')}</span>
                   <input
                     className="input"
                     type="password"
@@ -441,13 +498,13 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                     placeholder={
                       settings.steam_api_key_set
                         ? settings.steam_api_key_hint
-                        : 'Laisser vide pour conserver'
+                        : t('settings.integrations.keepSecret')
                     }
                     autoComplete="off"
                   />
                 </label>
                 <label className="field">
-                  <span>SteamID64</span>
+                  <span>{t('settings.integrations.steamId')}</span>
                   <input
                     className="input"
                     value={steamId}
@@ -463,23 +520,25 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                   className="text-button text-button--danger"
                   onClick={() => clearSecret('steam_api_key')}
                 >
-                  Supprimer la clé Steam
+                  {t('settings.integrations.deleteSteamKey')}
                 </button>
               )}
             </div>
 
             <div className="settings-group">
               <div className="settings-group__head">
-                <h3>IGDB</h3>
+                <h3>{t('settings.integrations.igdb')}</h3>
                 <span
                   className={`config-status${settings.igdb_configured ? ' is-on' : ' is-off'}`}
                 >
-                  {settings.igdb_configured ? 'Configuré' : 'Non configuré'}
+                  {settings.igdb_configured
+                    ? t('common.configured')
+                    : t('common.notConfigured')}
                 </span>
               </div>
               <div className="form-grid">
                 <label className="field">
-                  <span>Client ID</span>
+                  <span>{t('settings.integrations.clientId')}</span>
                   <input
                     className="input"
                     value={igdbClientId}
@@ -488,7 +547,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                   />
                 </label>
                 <label className="field">
-                  <span>Client secret</span>
+                  <span>{t('settings.integrations.clientSecret')}</span>
                   <input
                     className="input"
                     type="password"
@@ -497,7 +556,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                     placeholder={
                       settings.igdb_client_secret_set
                         ? settings.igdb_client_secret_hint
-                        : 'Laisser vide pour conserver'
+                        : t('settings.integrations.keepSecret')
                     }
                     autoComplete="off"
                   />
@@ -509,14 +568,14 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                   className="text-button text-button--danger"
                   onClick={() => clearSecret('igdb_client_secret')}
                 >
-                  Supprimer le secret IGDB
+                  {t('settings.integrations.deleteIgdbSecret')}
                 </button>
               )}
             </div>
 
             <button type="submit" className="button button--primary" disabled={saving}>
               <Save size={15} strokeWidth={2} />
-              Enregistrer les intégrations
+              {t('settings.integrations.save')}
             </button>
           </form>
         </section>
@@ -527,13 +586,13 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
           <section className="panel settings-panel">
             <header className="card-head">
               <div>
-                <h2>Ajouter un utilisateur</h2>
-                <p>Les lecteurs peuvent consulter le dashboard, sans accéder aux paramètres.</p>
+                <h2>{t('settings.users.addTitle')}</h2>
+                <p>{t('settings.users.addSubtitle')}</p>
               </div>
             </header>
             <form className="user-create-form" onSubmit={createUser}>
               <label className="field">
-                <span>Nom d'utilisateur</span>
+                <span>{t('settings.users.username')}</span>
                 <input
                   className="input"
                   value={newUsername}
@@ -543,7 +602,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                 />
               </label>
               <label className="field">
-                <span>Email (optionnel)</span>
+                <span>{t('settings.users.email')}</span>
                 <input
                   className="input"
                   type="email"
@@ -552,7 +611,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                 />
               </label>
               <label className="field">
-                <span>Mot de passe</span>
+                <span>{t('settings.users.password')}</span>
                 <input
                   className="input"
                   type="password"
@@ -563,23 +622,19 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                 />
               </label>
               <label className="field">
-                <span>Rôle</span>
+                <span>{t('settings.users.role')}</span>
                 <select
                   className="select"
                   value={newRole}
                   onChange={(event) => setNewRole(event.target.value as UserRole)}
                 >
-                  <option value="viewer">Lecteur</option>
-                  <option value="admin">Administrateur</option>
+                  <option value="viewer">{t('common.viewer')}</option>
+                  <option value="admin">{t('common.adminShort')}</option>
                 </select>
               </label>
-              <button
-                type="submit"
-                className="button button--primary"
-                disabled={creatingUser}
-              >
+              <button type="submit" className="button button--primary" disabled={saving}>
                 <UserPlus size={15} strokeWidth={2} />
-                Créer
+                {t('settings.users.create')}
               </button>
             </form>
           </section>
@@ -587,17 +642,17 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
           <section className="panel settings-panel">
             <header className="card-head">
               <div>
-                <h2>Comptes</h2>
-                <p>{users.length} utilisateur(s) enregistré(s).</p>
+                <h2>{t('settings.users.accounts')}</h2>
+                <p>{t('settings.users.count', { count: users.length })}</p>
               </div>
             </header>
 
             <div className="users-table">
               <div className="users-table__head">
-                <span>Utilisateur</span>
-                <span>Rôle</span>
-                <span>Statut</span>
-                <span>Dernière connexion</span>
+                <span>{t('settings.users.user')}</span>
+                <span>{t('settings.users.role')}</span>
+                <span>{t('settings.users.status')}</span>
+                <span>{t('settings.users.lastLogin')}</span>
                 <span />
               </div>
               {users.map((user) => {
@@ -610,8 +665,11 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                           {user.username.slice(0, 2).toUpperCase()}
                         </span>
                         <div>
-                          <strong>{user.username}{self ? ' (vous)' : ''}</strong>
-                          <span>{user.email || 'Pas d’email'}</span>
+                          <strong>
+                            {user.username}
+                            {self ? ` ${t('settings.users.you')}` : ''}
+                          </strong>
+                          <span>{user.email || t('settings.users.noEmail')}</span>
                         </div>
                       </div>
                       <select
@@ -622,23 +680,33 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                           updateUser(user.id, { role: event.target.value as UserRole })
                         }
                       >
-                        <option value="viewer">Lecteur</option>
-                        <option value="admin">Admin</option>
+                        <option value="viewer">{t('common.viewer')}</option>
+                        <option value="admin">{t('common.adminShort')}</option>
                       </select>
                       <span
                         className={`config-status${user.is_active ? ' is-on' : ' is-off'}`}
                       >
-                        {user.is_active ? 'Actif' : 'Désactivé'}
+                        {user.is_active ? t('common.active') : t('common.disabled')}
                       </span>
                       <span className="user-last-login">
-                        {user.last_login_at ? formatRelative(user.last_login_at) : 'Jamais'}
+                        {user.last_login_at
+                          ? formatRelative(user.last_login_at, lang)
+                          : t('common.never')}
                       </span>
                       <div className="user-actions">
                         <button
                           type="button"
                           className="button button--icon"
-                          title={user.is_active ? 'Désactiver' : 'Activer'}
-                          aria-label={user.is_active ? 'Désactiver' : 'Activer'}
+                          title={
+                            user.is_active
+                              ? t('settings.users.deactivate')
+                              : t('settings.users.activate')
+                          }
+                          aria-label={
+                            user.is_active
+                              ? t('settings.users.deactivate')
+                              : t('settings.users.activate')
+                          }
                           disabled={self}
                           onClick={() =>
                             updateUser(user.id, { is_active: !user.is_active })
@@ -649,8 +717,8 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                         <button
                           type="button"
                           className="button button--icon"
-                          title="Réinitialiser le mot de passe"
-                          aria-label="Réinitialiser le mot de passe"
+                          title={t('settings.users.resetPassword')}
+                          aria-label={t('settings.users.resetPassword')}
                           disabled={self}
                           onClick={() => {
                             setResetUserId(resetUserId === user.id ? null : user.id)
@@ -662,8 +730,8 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                         <button
                           type="button"
                           className="button button--icon button--danger"
-                          title="Supprimer"
-                          aria-label="Supprimer"
+                          title={t('common.delete')}
+                          aria-label={t('common.delete')}
                           disabled={self}
                           onClick={() => deleteUser(user)}
                         >
@@ -687,12 +755,12 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                           type="password"
                           value={resetPassword}
                           onChange={(event) => setResetPassword(event.target.value)}
-                          placeholder="Nouveau mot de passe (8 caractères min.)"
+                          placeholder={t('settings.users.newPasswordPlaceholder')}
                           minLength={8}
                           required
                         />
                         <button type="submit" className="button button--primary">
-                          Appliquer
+                          {t('common.apply')}
                         </button>
                       </form>
                     )}
@@ -708,13 +776,13 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
         <section className="panel settings-panel settings-panel--narrow">
           <header className="card-head">
             <div>
-              <h2>Mon compte</h2>
-              <p>Connecté en tant que {currentUser.username}.</p>
+              <h2>{t('settings.account.title')}</h2>
+              <p>{t('settings.account.subtitle', { username: currentUser.username })}</p>
             </div>
           </header>
           <form className="settings-form" onSubmit={changeAccountPassword}>
             <label className="field">
-              <span>Mot de passe actuel</span>
+              <span>{t('settings.account.currentPassword')}</span>
               <input
                 className="input"
                 type="password"
@@ -726,7 +794,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
             </label>
             <div className="form-grid">
               <label className="field">
-                <span>Nouveau mot de passe</span>
+                <span>{t('settings.account.newPassword')}</span>
                 <input
                   className="input"
                   type="password"
@@ -738,7 +806,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
                 />
               </label>
               <label className="field">
-                <span>Confirmer</span>
+                <span>{t('settings.account.confirm')}</span>
                 <input
                   className="input"
                   type="password"
@@ -752,9 +820,109 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
             </div>
             <button type="submit" className="button button--primary">
               <Save size={15} strokeWidth={2} />
-              Modifier le mot de passe
+              {t('settings.account.change')}
             </button>
           </form>
+        </section>
+      )}
+
+      {tab === 'backup' && (
+        <section className="panel settings-panel">
+          <header className="card-head">
+            <div>
+              <h2>{t('settings.backup.title')}</h2>
+              <p>{t('settings.backup.subtitle')}</p>
+            </div>
+          </header>
+
+          <div className="backup-warning">
+            <AlertTriangle size={16} strokeWidth={2} />
+            {t('settings.backup.warning')}
+          </div>
+
+          <div className="backup-grid">
+            <div className="backup-card">
+              <div>
+                <h3>{t('settings.backup.exportTitle')}</h3>
+                <p>{t('settings.backup.exportText')}</p>
+              </div>
+              <div className="backup-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => downloadBackup('json')}
+                  disabled={backupBusy !== null}
+                >
+                  <Download size={14} strokeWidth={2} />
+                  {backupBusy === 'download-json'
+                    ? t('settings.backup.downloading')
+                    : t('settings.backup.downloadJson')}
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => downloadBackup('sqlite')}
+                  disabled={backupBusy !== null}
+                >
+                  <Download size={14} strokeWidth={2} />
+                  {backupBusy === 'download-sqlite'
+                    ? t('settings.backup.downloading')
+                    : t('settings.backup.downloadSqlite')}
+                </button>
+              </div>
+            </div>
+
+            <div className="backup-card">
+              <div>
+                <h3>{t('settings.backup.restoreTitle')}</h3>
+                <p>{t('settings.backup.restoreText')}</p>
+              </div>
+              <div className="backup-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => jsonInputRef.current?.click()}
+                  disabled={backupBusy !== null}
+                >
+                  <Upload size={14} strokeWidth={2} />
+                  {backupBusy === 'upload-json'
+                    ? t('settings.backup.uploading')
+                    : t('settings.backup.restoreJson')}
+                </button>
+                <input
+                  ref={jsonInputRef}
+                  className="file-input"
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(event) => {
+                    void restoreBackup('json', event.target.files?.[0] ?? null)
+                    event.target.value = ''
+                  }}
+                />
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => sqliteInputRef.current?.click()}
+                  disabled={backupBusy !== null}
+                >
+                  <Upload size={14} strokeWidth={2} />
+                  {backupBusy === 'upload-sqlite'
+                    ? t('settings.backup.uploading')
+                    : t('settings.backup.restoreSqlite')}
+                </button>
+                <input
+                  ref={sqliteInputRef}
+                  className="file-input"
+                  type="file"
+                  accept=".db,.sqlite,application/vnd.sqlite3"
+                  onChange={(event) => {
+                    void restoreBackup('sqlite', event.target.files?.[0] ?? null)
+                    event.target.value = ''
+                  }}
+                />
+              </div>
+            </div>
+          </div>
         </section>
       )}
 
@@ -763,32 +931,32 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
           <section className="panel settings-panel">
             <header className="card-head">
               <div>
-                <h2>Documentation API</h2>
-                <p>Les pages de documentation sont protégées par votre session.</p>
+                <h2>{t('settings.docs.title')}</h2>
+                <p>{t('settings.docs.subtitle')}</p>
               </div>
             </header>
             <div className="docs-links">
               <a href={docsLinks.swagger} target="_blank" rel="noreferrer">
                 <BookOpen size={17} strokeWidth={2} />
                 <span>
-                  <strong>Swagger UI</strong>
-                  <small>Tester les endpoints</small>
+                  <strong>{t('settings.docs.swagger')}</strong>
+                  <small>{t('settings.docs.swaggerHint')}</small>
                 </span>
                 <ExternalLink size={14} />
               </a>
               <a href={docsLinks.redoc} target="_blank" rel="noreferrer">
                 <BookOpen size={17} strokeWidth={2} />
                 <span>
-                  <strong>ReDoc</strong>
-                  <small>Référence lisible</small>
+                  <strong>{t('settings.docs.redoc')}</strong>
+                  <small>{t('settings.docs.redocHint')}</small>
                 </span>
                 <ExternalLink size={14} />
               </a>
               <a href={docsLinks.readme} target="_blank" rel="noreferrer">
                 <BookOpen size={17} strokeWidth={2} />
                 <span>
-                  <strong>README</strong>
-                  <small>Installation et intégrations</small>
+                  <strong>{t('settings.docs.readme')}</strong>
+                  <small>{t('settings.docs.readmeHint')}</small>
                 </span>
                 <ExternalLink size={14} />
               </a>
@@ -798,18 +966,15 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
           <section className="panel settings-panel">
             <header className="card-head">
               <div>
-                <h2>Agent Windows</h2>
-                <p>Configuration du tracker local.</p>
+                <h2>{t('settings.docs.agentTitle')}</h2>
+                <p>{t('settings.docs.agentSubtitle')}</p>
               </div>
             </header>
             <div className="docs-code">
               <code>POST {window.location.origin}/api/heartbeat</code>
-              <code>Header X-Agent-Key: &lt;clé agent&gt;</code>
+              <code>Header X-Agent-Key: &lt;agent key&gt;</code>
             </div>
-            <p className="settings-hint">
-              La clé agent se gère dans l'onglet Général. Ne la partagez pas et ne
-              l'exposez pas dans un dépôt.
-            </p>
+            <p className="settings-hint">{t('settings.docs.agentKeyHint')}</p>
           </section>
         </div>
       )}

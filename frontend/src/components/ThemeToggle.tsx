@@ -1,5 +1,6 @@
 import { Moon, Sun } from 'lucide-react'
 import type { Theme } from '../types'
+import { useI18n } from '../i18n'
 
 interface ThemeToggleProps {
   theme: Theme
@@ -7,15 +8,16 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ theme, onThemeChange }: ThemeToggleProps) {
+  const { t } = useI18n()
   return (
-    <div className="theme-switch" role="group" aria-label="Thème de l'interface">
+    <div className="theme-switch" role="group" aria-label={t('common.lightTheme')}>
       <button
         type="button"
         className={`theme-switch__button${theme === 'light' ? ' is-active' : ''}`}
         onClick={() => onThemeChange('light')}
         aria-pressed={theme === 'light'}
-        aria-label="Thème clair"
-        title="Thème clair"
+        aria-label={t('common.lightTheme')}
+        title={t('common.lightTheme')}
       >
         <Sun size={15} strokeWidth={2} />
       </button>
@@ -24,8 +26,8 @@ export function ThemeToggle({ theme, onThemeChange }: ThemeToggleProps) {
         className={`theme-switch__button${theme === 'dark' ? ' is-active' : ''}`}
         onClick={() => onThemeChange('dark')}
         aria-pressed={theme === 'dark'}
-        aria-label="Thème sombre"
-        title="Thème sombre"
+        aria-label={t('common.darkTheme')}
+        title={t('common.darkTheme')}
       >
         <Moon size={15} strokeWidth={2} />
       </button>

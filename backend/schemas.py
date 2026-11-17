@@ -41,6 +41,10 @@ class PasswordChangeIn(BaseModel):
     new_password: str = Field(min_length=8, max_length=256)
 
 
+class ProfileUpdateIn(BaseModel):
+    locale: Literal["fr", "en"] | None = None
+
+
 class UserCreateIn(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     email: str | None = Field(default=None, max_length=255)

@@ -1,6 +1,7 @@
 import { Gamepad2, Radio, Wifi, WifiOff } from 'lucide-react'
 import type { AgentInfo, GameSession, Summary } from '../types'
 import { formatDuration, formatSessionTime } from '../format'
+import { useI18n } from '../i18n'
 import { Cover } from './Cover'
 
 interface LiveCardProps {
@@ -10,6 +11,7 @@ interface LiveCardProps {
 }
 
 export function LiveCard({ summary, sessions, agents }: LiveCardProps) {
+  const { t, lang } = useI18n()
   const live = sessions.find((session) => session.is_live)
   const onlineAgents = agents.filter((agent) => agent.online)
   const primaryAgent = onlineAgents[0]
@@ -18,27 +20,32 @@ export function LiveCard({ summary, sessions, agents }: LiveCardProps) {
     <section className="panel live-panel">
       <header className="card-head">
         <div>
-          <h2>En ce moment</h2>
-          <p>État du suivi en direct</p>
+          <h2>{t('live.title')}</h2>
+          <p>{t('live.subtitle')}</p>
         </div>
         <span className={`live-status${live ? ' is-live' : ''}`}>
           <span className="live-status__dot" />
-          {live ? 'En jeu' : 'Au repos'}
+          {live ? t('live.inGame') : t('live.idle')}
         </span>
       </header>
 
       {live ? (
         <div className="live-session">
-          <Cover src={live.cover_url} name={live.game_name} className="live-session__cover" eager />
+          <Cover
+            src={live.cover_url}
+            name={live.game_name}
+            className="live-session__cover"
+            eager
+          />
           <div className="live-session__body">
             <span className="live-session__label">
               <Radio size={12} strokeWidth={2.2} />
-              Session en cours
+              {t('live.session')}
             </span>
             <h3>{live.game_name}</h3>
             <p>
-              {formatDuration(live.duration_seconds)} · depuis{' '}
-              {formatSessionTime(live.started_at)}
+              {formatDuration(live.duration_seconds, lang)} ·{' '}
+              {t('live.since', { time: formatSessionTime(live.started_at, lang) })}
             </p>
           </div>
         </div>
@@ -48,32 +55,32 @@ export function LiveCard({ summary, sessions, agents }: LiveCardProps) {
             <Gamepad2 size={26} strokeWidth={1.7} />
           </span>
           <div>
-            <h3>Aucune session active</h3>
-            <p>Lance un jeu suivi par l'agent pour démarrer le suivi.</p>
+            <h3>{t('live.noSession')}</h3>
+            <p>{t('live.hint')}</p>
           </div>
         </div>
       )}
 
       <footer className="live-panel__footer">
         <div className="live-meta">
-          <span>Agent PC</span>
+          <span>{t('live.agentPC')}</span>
           <strong>
             {primaryAgent ? (
               primaryAgent.hostname ?? primaryAgent.agent_id
             ) : (
               <span className="text-muted">
-                {onlineAgents.length > 0 ? 'Connecté' : 'Non connecté'}
+                {onlineAgents.length > 0 ? t('live.connected') : t('live.notConnected')}
               </span>
             )}
           </strong>
         </div>
         <div className="live-meta">
-          <span>Sessions / 7 j</span>
+          <span>{t('live.sessions7')}</span>
           <strong>{summary.sessions_week}</strong>
         </div>
         <span className={`agent-state${onlineAgents.length > 0 ? ' is-online' : ''}`}>
           {onlineAgents.length > 0 ? <Wifi size={13} /> : <WifiOff size={13} />}
-          {onlineAgents.length > 0 ? 'En ligne' : 'Hors ligne'}
+          {onlineAgents.length > 0 ? t('live.online') : t('live.offline')}
         </span>
       </footer>
     </section>

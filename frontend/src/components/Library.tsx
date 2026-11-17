@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Clock3, LibraryBig, Search, Trophy } from 'lucide-react'
 import type { Game } from '../types'
 import { formatPlaytime } from '../format'
+import { useI18n } from '../i18n'
 import { Cover } from './Cover'
 
 interface LibraryProps {
@@ -11,13 +12,8 @@ interface LibraryProps {
 
 type SortMode = 'playtime' | 'recent' | 'name'
 
-const SORT_OPTIONS: { value: SortMode; label: string }[] = [
-  { value: 'playtime', label: 'Temps' },
-  { value: 'recent', label: 'Récents' },
-  { value: 'name', label: 'A-Z' },
-]
-
 export function Library({ games, loading }: LibraryProps) {
+  const { t, lang } = useI18n()
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortMode>('playtime')
 
@@ -35,15 +31,19 @@ export function Library({ games, loading }: LibraryProps) {
   )
 
   const visibleGames = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase('fr')
+    const term = search.trim().toLocaleLowerCase(lang === 'fr' ? 'fr' : 'en')
     const filtered = term
       ? games.filter((game) =>
-          `${game.name} ${game.genres.join(' ')}`.toLocaleLowerCase('fr').includes(term),
+          `${game.name} ${game.genres.join(' ')}`
+            .toLocaleLowerCase(lang === 'fr' ? 'fr' : 'en')
+            .includes(term),
         )
       : games
 
     return [...filtered].sort((left, right) => {
-      if (sort === 'name') return left.name.localeCompare(right.name, 'fr')
+      if (sort === 'name') {
+        return left.name.localeCompare(right.name, lang === 'fr' ? 'fr' : 'en')
+      }
       if (sort === 'recent') {
         return (
           new Date(right.last_played_at ?? 0).getTime() -
@@ -52,7 +52,13 @@ export function Library({ games, loading }: LibraryProps) {
       }
       return right.steam_playtime_minutes - left.steam_playtime_minutes
     })
-  }, [games, search, sort])
+  }, [games, search, sort, lang])
+
+  const sortOptions: { value: SortMode; label: string }[] = [
+    { value: 'playtime', label: t('library.sortTime') },
+    { value: 'recent', label: t('library.sortRecent') },
+    { value: 'name', label: t('library.sortName') },
+  ]
 
   return (
     <div className="page-stack">
@@ -61,18 +67,18 @@ export function Library({ games, loading }: LibraryProps) {
           <div className="library-metrics">
             <span>
               <LibraryBig size={15} strokeWidth={2} />
-              <strong>{games.length}</strong> jeux
+              <strong>{games.length}</strong> {t('library.games')}
             </span>
             <span>
               <Clock3 size={15} strokeWidth={2} />
-              <strong>{formatPlaytime(stats.minutes)}</strong> joués
+              <strong>{formatPlaytime(stats.minutes, lang)}</strong> {t('library.played')}
             </span>
             <span>
               <Trophy size={15} strokeWidth={2} />
               <strong>
                 {stats.achievementsUnlocked}/{stats.achievementsTotal}
               </strong>{' '}
-              succès
+              {t('library.achievements')}
             </span>
           </div>
 
@@ -81,15 +87,15 @@ export function Library({ games, loading }: LibraryProps) {
               <Search size={15} strokeWidth={2} />
               <input
                 type="search"
-                placeholder="Rechercher un jeu…"
+                placeholder={t('library.search')}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                aria-label="Rechercher dans la bibliothèque"
+                aria-label={t('library.search')}
               />
             </label>
 
-            <div className="segmented" role="group" aria-label="Trier la bibliothèque">
-              {SORT_OPTIONS.map((option) => (
+            <div className="segmented" role="group" aria-label={t('library.search')}>
+              {sortOptions.map((option) => (
                 <button
                   key={option.value}
                   type="button"
@@ -105,7 +111,7 @@ export function Library({ games, loading }: LibraryProps) {
       </section>
 
       {loading ? (
-        <div className="library-grid" aria-label="Chargement de la bibliothèque">
+        <div className="library-grid" aria-label={t('settings.loading')}>
           {Array.from({ length: 10 }, (_, index) => (
             <span key={index} className="game-skeleton" />
           ))}
@@ -116,11 +122,11 @@ export function Library({ games, loading }: LibraryProps) {
             <span className="empty-state__icon">
               <LibraryBig size={26} strokeWidth={1.7} />
             </span>
-            <strong>{games.length === 0 ? 'Bibliothèque vide' : 'Aucun résultat'}</strong>
+            <strong>
+              {games.length === 0 ? t('library.emptyTitle') : t('library.noResults')}
+            </strong>
             <p>
-              {games.length === 0
-                ? 'Renseigne STEAM_API_KEY et STEAM_ID dans .env, puis relance le backend.'
-                : 'Essaie un autre titre ou un autre genre.'}
+              {games.length === 0 ? t('library.emptyText') : t('library.noResultsText')}
             </p>
           </div>
         </section>
@@ -137,11 +143,13 @@ export function Library({ games, loading }: LibraryProps) {
                 <div className="game-card__media">
                   <Cover src={game.cover_url} name={game.name} className="game-cover" />
                   <span className="game-card__playtime">
-                    {formatPlaytime(game.steam_playtime_minutes)}
+                    {formatPlaytime(game.steam_playtime_minutes, lang)}
                   </span>
                   {game.playtime_2weeks_minutes > 0 && (
                     <span className="game-card__recent">
-                      +{formatPlaytime(game.playtime_2weeks_minutes)} · 14 j
+                      {t('library.recentBadge', {
+                        duration: formatPlaytime(game.playtime_2weeks_minutes, lang),
+                      })}
                     </span>
                   )}
                 </div>
@@ -149,7 +157,7 @@ export function Library({ games, loading }: LibraryProps) {
                 <div className="game-card__body">
                   <h3 title={game.name}>{game.name}</h3>
                   <p className="game-card__genres">
-                    {game.genres.slice(0, 2).join(' · ') || 'Genre inconnu'}
+                    {game.genres.slice(0, 2).join(' · ') || t('library.unknownGenre')}
                   </p>
 
                   {game.achievements_total > 0 ? (
@@ -157,7 +165,7 @@ export function Library({ games, loading }: LibraryProps) {
                       <div className="achievements__label">
                         <span>
                           <Trophy size={11} strokeWidth={2.2} />
-                          Succès
+                          {t('library.achievementsLabel')}
                         </span>
                         <span>
                           {game.achievements_unlocked}/{game.achievements_total}
@@ -168,7 +176,7 @@ export function Library({ games, loading }: LibraryProps) {
                       </div>
                     </div>
                   ) : (
-                    <span className="game-card__empty">Pas de succès suivis</span>
+                    <span className="game-card__empty">{t('library.noAchievements')}</span>
                   )}
                 </div>
               </article>

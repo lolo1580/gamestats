@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
 import type { DailyStats, Summary } from '../types'
-import { formatDuration } from '../format'
+import { formatDuration, localeFor } from '../format'
+import { useI18n } from '../i18n'
 
 interface WeekChartProps {
   daily: DailyStats | null
@@ -14,10 +15,10 @@ function dateLabel(date: string): string {
   return String(parsed.getDate())
 }
 
-function dateTitle(date: string): string {
+function dateTitle(date: string, locale: string): string {
   const parsed = new Date(`${date}T12:00:00`)
   if (Number.isNaN(parsed.getTime())) return date
-  return new Intl.DateTimeFormat('fr-FR', {
+  return new Intl.DateTimeFormat(locale, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -25,6 +26,7 @@ function dateTitle(date: string): string {
 }
 
 export function WeekChart({ daily, summary }: WeekChartProps) {
+  const { t, lang } = useI18n()
   const items = daily?.items ?? []
 
   const { lastSevenSeconds, previousSevenSeconds, maxSeconds, totalSeconds } = useMemo(() => {
@@ -47,11 +49,7 @@ export function WeekChart({ daily, summary }: WeekChartProps) {
       : null
   const DeltaIcon = delta === null ? Minus : delta >= 0 ? ArrowUpRight : ArrowDownRight
   const deltaLabel =
-    delta === null
-      ? lastSevenSeconds > 0
-        ? 'Nouveau'
-        : '—'
-      : `${delta > 0 ? '+' : ''}${delta} %`
+    delta === null ? (lastSevenSeconds > 0 ? t('chart.new') : t('chart.none')) : `${delta > 0 ? '+' : ''}${delta} %`
 
   const average = Math.round(weekSeconds / 7)
 
@@ -59,20 +57,16 @@ export function WeekChart({ daily, summary }: WeekChartProps) {
     <section className="panel chart-panel">
       <header className="card-head">
         <div>
-          <h2>Activité récente</h2>
-          <p>Temps de jeu quotidien sur 14 jours</p>
+          <h2>{t('chart.title')}</h2>
+          <p>{t('chart.subtitle')}</p>
         </div>
         <div className="chart-headline">
-          <strong>{formatDuration(weekSeconds)}</strong>
-          <span>7 derniers jours</span>
+          <strong>{formatDuration(weekSeconds, lang)}</strong>
+          <span>{t('chart.last7')}</span>
         </div>
       </header>
 
-      <div
-        className="chart"
-        role="img"
-        aria-label="Temps de jeu des 14 derniers jours"
-      >
+      <div className="chart" role="img" aria-label={t('chart.aria')}>
         <div className="chart__grid" aria-hidden="true">
           <span />
           <span />
@@ -88,7 +82,10 @@ export function WeekChart({ daily, summary }: WeekChartProps) {
               <div
                 key={item.date}
                 className={`chart__col${current ? ' is-current' : ''}`}
-                title={`${dateTitle(item.date)} — ${formatDuration(item.seconds)}`}
+                title={`${dateTitle(item.date, localeFor(lang))} — ${formatDuration(
+                  item.seconds,
+                  lang,
+                )}`}
               >
                 <div className="chart__bar-track">
                   <span
@@ -105,15 +102,15 @@ export function WeekChart({ daily, summary }: WeekChartProps) {
 
       <footer className="chart__footer">
         <div className="chart-stat">
-          <span>Moyenne / jour</span>
-          <strong>{formatDuration(average)}</strong>
+          <span>{t('chart.avg')}</span>
+          <strong>{formatDuration(average, lang)}</strong>
         </div>
         <div className="chart-stat">
-          <span>Total 14 jours</span>
-          <strong>{formatDuration(totalSeconds)}</strong>
+          <span>{t('chart.total14')}</span>
+          <strong>{formatDuration(totalSeconds, lang)}</strong>
         </div>
         <div className="chart-stat">
-          <span>Évolution</span>
+          <span>{t('chart.evolution')}</span>
           <strong className={`chart-delta${delta !== null && delta < 0 ? ' is-negative' : ''}`}>
             <DeltaIcon size={13} strokeWidth={2.2} />
             {deltaLabel}

@@ -1,17 +1,27 @@
 import { Fragment, useMemo } from 'react'
 import { Zap } from 'lucide-react'
 import type { HeatmapData } from '../types'
-import { formatCompactDuration, formatDuration } from '../format'
+import { formatCompactDuration, formatDuration, localeFor } from '../format'
+import { useI18n } from '../i18n'
 
 interface HeatmapProps {
   data: HeatmapData
 }
 
-const DAYS_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-const DAYS_LONG = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
 
+function weekdayLabels(lang: 'fr' | 'en', style: 'short' | 'long'): string[] {
+  const formatter = new Intl.DateTimeFormat(localeFor(lang), { weekday: style })
+  return Array.from({ length: 7 }, (_, index) =>
+    formatter.format(new Date(Date.UTC(2024, 0, 1 + index))),
+  )
+}
+
 export function Heatmap({ data }: HeatmapProps) {
+  const { t, lang } = useI18n()
+  const daysShort = useMemo(() => weekdayLabels(lang, 'short'), [lang])
+  const daysLong = useMemo(() => weekdayLabels(lang, 'long'), [lang])
+
   const { matrix, rowTotals, total, peak } = useMemo(() => {
     const grid = Array.from({ length: 7 }, () => Array<number>(24).fill(0))
     for (const cell of data.cells) {
@@ -40,28 +50,24 @@ export function Heatmap({ data }: HeatmapProps) {
   const max = Math.max(data.max_seconds, 1)
   const peakLabel =
     peak.seconds > 0
-      ? `${DAYS_SHORT[peak.weekday]} ${String(peak.hour).padStart(2, '0')}h`
-      : 'Aucun pic'
+      ? `${daysShort[peak.weekday]} ${String(peak.hour).padStart(2, '0')}h`
+      : t('heatmap.noPeak')
 
   return (
     <section className="panel heatmap-panel">
       <header className="card-head">
         <div>
-          <h2>Habitudes de jeu</h2>
-          <p>{formatDuration(total)} réparties sur 365 jours</p>
+          <h2>{t('heatmap.title')}</h2>
+          <p>{t('heatmap.subtitle', { duration: formatDuration(total, lang) })}</p>
         </div>
         <span className="badge badge--accent">
           <Zap size={13} strokeWidth={2.2} />
-          Pic {peakLabel}
+          {t('heatmap.peak', { label: peakLabel })}
         </span>
       </header>
 
       <div className="heatmap-scroll">
-        <div
-          className="heatmap"
-          role="img"
-          aria-label="Temps de jeu par jour de la semaine et par heure"
-        >
+        <div className="heatmap" role="img" aria-label={t('heatmap.aria')}>
           <div className="heatmap__corner" />
           {HOURS.map((hour) => (
             <div key={hour} className="heatmap__hour">
@@ -72,7 +78,7 @@ export function Heatmap({ data }: HeatmapProps) {
 
           {matrix.map((row, weekday) => (
             <Fragment key={weekday}>
-              <div className="heatmap__day">{DAYS_SHORT[weekday]}</div>
+              <div className="heatmap__day">{daysShort[weekday]}</div>
               {row.map((seconds, hour) => {
                 const intensity = seconds > 0 ? Math.sqrt(seconds / max) : 0
                 const background =
@@ -85,14 +91,14 @@ export function Heatmap({ data }: HeatmapProps) {
                     key={`${weekday}-${hour}`}
                     className={`heat-cell${seconds > 0 ? ' is-filled' : ''}`}
                     style={{ background }}
-                    title={`${DAYS_LONG[weekday]} ${String(hour).padStart(2, '0')}:00 — ${
-                      seconds > 0 ? formatDuration(seconds) : 'aucune session'
+                    title={`${daysLong[weekday]} ${String(hour).padStart(2, '0')}:00 — ${
+                      seconds > 0 ? formatDuration(seconds, lang) : '—'
                     }`}
                   />
                 )
               })}
               <div className="heatmap__row-total">
-                {formatCompactDuration(rowTotals[weekday])}
+                {formatCompactDuration(rowTotals[weekday], lang)}
               </div>
             </Fragment>
           ))}
@@ -101,15 +107,15 @@ export function Heatmap({ data }: HeatmapProps) {
 
       <footer className="heatmap__footer">
         <div className="heatmap__legend">
-          <span>Moins</span>
+          <span>{t('heatmap.less')}</span>
           <div className="heatmap__scale" aria-hidden="true">
             {[0.12, 0.28, 0.46, 0.64, 0.82, 1].map((opacity) => (
               <span key={opacity} style={{ background: `rgba(76, 141, 255, ${opacity})` }} />
             ))}
           </div>
-          <span>Plus</span>
+          <span>{t('heatmap.more')}</span>
         </div>
-        <span>Chaque case représente une heure de la semaine</span>
+        <span>{t('heatmap.note')}</span>
       </footer>
     </section>
   )
