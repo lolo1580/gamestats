@@ -18,8 +18,8 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#MyAppExeName}
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 AppMutex=GameStatsAgentMutex
 CloseApplications=no
 
@@ -74,7 +74,7 @@ Name: "{userstartup}\GameStats Agent"; Filename: "{app}\{#MyAppExeName}"; Tasks:
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--once"; Description: "{cm:TestConnection}"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
-Filename: "{cmd}"; Parameters: "/C taskkill /IM {#MyAppExeName} /F >NUL 2>&1"; Flags: runhidden
+Filename: "{cmd}"; Parameters: "/C taskkill /IM {#MyAppExeName} /F >NUL 2>&1"; Flags: runhidden; RunOnceId: "KillAgent"
 
 [Code]
 var

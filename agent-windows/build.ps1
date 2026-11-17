@@ -51,9 +51,12 @@ if (${env:ProgramFiles(x86)}) {
 if ($env:ProgramFiles) {
     $IsccCandidates += (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe")
 }
+if ($env:LOCALAPPDATA) {
+    $IsccCandidates += (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe")
+}
 $Iscc = $IsccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $Iscc) {
-    throw "Inno Setup 6 is required. Install it from https://jrsoftware.org/isinfo.php, then rerun this script."
+    throw "Inno Setup 6 is required. Install it with 'winget install JRSoftware.InnoSetup' or from https://jrsoftware.org/isinfo.php, then rerun this script."
 }
 
 & $Iscc installer.iss
