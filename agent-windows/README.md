@@ -59,7 +59,28 @@ exécutables détectés par le gestionnaire de tâches. Exemple :
 }
 ```
 
-Relancez l’agent après modification de la liste.
+L’agent recharge `games.json` automatiquement dès que le fichier change : aucun
+redémarrage n’est nécessaire. Si le nouveau fichier est invalide, la liste
+précédente reste utilisée et l’erreur est écrite dans `agent.log`.
+
+Certains jeux tournent sous un exécutable générique (`javaw.exe`, émulateurs,
+moteurs partagés) et ne peuvent pas être identifiés par le processus. Pour ces
+cas, utilisez `window_titles` : l’agent compare le titre de la fenêtre au premier
+plan, sans tenir compte de la casse, avec des jokers `*` et `?`.
+
+```json
+{
+  "name": "Minecraft (Java)",
+  "window_titles": ["Minecraft*"]
+}
+```
+
+Une entrée doit contenir au moins `processes` ou `window_titles`. Le processus
+reste prioritaire : si les deux sont renseignés, la correspondance par processus
+est utilisée en premier. La détection par fenêtre lit le titre de la fenêtre au
+premier plan : elle nécessite donc que l’agent tourne dans la session de
+l’utilisateur, ce qui est le cas de l’installateur et du démarrage automatique
+(mais pas d’une tâche planifiée exécutée en tant que SYSTEM).
 
 ## Diagnostic
 
@@ -82,10 +103,22 @@ délai progressif (30 s, 60 s, 120 s… jusqu’à 5 minutes) et reprend le ryth
 normal dès qu’une réponse revient. Une erreur inattendue pendant un cycle est
 journalisée et l’agent continue.
 
-Les entrées invalides de `games.json` (nom manquant, liste de processus vide,
-`steam_app_id` non numérique) sont ignorées et signalées dans `agent.log`. Ce
-fichier est limité à 1 Mo et conservé en trois archives (`agent.log.1` à
-`agent.log.3`).
+Les entrées invalides de `games.json` (nom manquant, ni processus ni titre de
+fenêtre, `steam_app_id` non numérique) sont ignorées et signalées dans
+`agent.log`. Ce fichier est limité à 1 Mo et conservé en trois archives
+(`agent.log.1` à `agent.log.3`).
+
+## Tests
+
+```powershell
+py -m pip install pytest
+py -m pytest tests -q
+```
+
+Les tests couvrent le chargement de `games.json`, la détection par processus ou
+par titre de fenêtre, le format du heartbeat et les fonctions utilitaires de
+l’agent. Ils tournent aussi dans le workflow GitHub Actions « Build Windows
+agent ».
 
 ## Construire l’installateur
 

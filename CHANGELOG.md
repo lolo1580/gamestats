@@ -60,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   images automatically bundle the latest Windows agent artifact.
 - `--list-processes` diagnostic in the Windows agent, which lists running
   executables and flags the ones already watched, to help fill `games.json`.
+- Window-title detection in the Windows agent: `window_titles` accepts
+  case-insensitive `*` and `?` patterns and identifies games running under a
+  shared host such as `javaw.exe`.
+- Unit tests for the Windows agent, run by the Build Windows agent workflow.
 
 ### Changed
 
@@ -86,6 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retries an unreachable backend with capped exponential backoff, rotates its
   log file, reports ignored `games.json` entries, and sends its real version in
   the `User-Agent` header.
+- The Windows agent reloads `games.json` as soon as the file changes and keeps
+  the previous list when the new file is invalid.
 
 ### Security
 

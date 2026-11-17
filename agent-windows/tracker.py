@@ -3,12 +3,14 @@
 
 Détecte les processus de jeux déclarés dans games.json et envoie un heartbeat
 au backend. Aucune donnée de jeu n'est envoyée au-delà du nom du jeu et des
-processus détectés.
+processus détectés. Un jeu peut aussi être reconnu par le titre de sa fenêtre
+(utile lorsque l'exécutable est générique, par exemple ``javaw.exe``).
 """
 
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import logging
 import os
@@ -26,7 +28,7 @@ import requests
 
 LOGGER = logging.getLogger("gamestats-agent")
 APP_NAME = "GameStats"
-AGENT_VERSION = "1.2.0"
+AGENT_VERSION = "1.3.0"
 
 # Contrat backend : au plus 64 jeux par heartbeat.
 MAX_GAMES_PER_HEARTBEAT = 64
@@ -341,15 +343,36 @@ def load_game_mappings(path: Path) -> list[dict[str, Any]]:
                 if str(process).strip()
             }
         )
-        if not normalized:
+
+        titles_raw = entry.get("window_titles") or []
+        if not isinstance(titles_raw, list):
             LOGGER.warning(
-                "Entrée ignorée dans %s : aucun processus valide pour « %s ».",
+                "window_titles ignoré pour « %s » : liste de titres attendue.",
+                name,
+            )
+            titles_raw = []
+        titles = sorted(
+            {
+                str(title).strip().casefold()
+                for title in titles_raw
+                if str(title).strip()
+            }
+        )
+
+        if not normalized and not titles:
+            LOGGER.warning(
+                "Entrée ignorée dans %s : aucun processus ni titre de fenêtre "
+                "valide pour « %s ».",
                 path,
                 name,
             )
             continue
 
-        mapping: dict[str, Any] = {"name": name, "processes": normalized}
+        mapping: dict[str, Any] = {
+            "name": name,
+            "processes": normalized,
+            "window_titles": titles,
+        }
         steam_app_id = entry.get("steam_app_id")
         if isinstance(steam_app_id, str) and steam_app_id.strip().isdigit():
             steam_app_id = int(steam_app_id.strip())
@@ -379,8 +402,45 @@ def running_process_names() -> set[str]:
     return names
 
 
+def active_window_title() -> str:
+    """Titre de la fenêtre au premier plan (chaîne vide hors Windows)."""
+    if os.name != "nt":
+        return ""
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        handle = user32.GetForegroundWindow()
+        if not handle:
+            return ""
+        length = user32.GetWindowTextLengthW(handle)
+        if length <= 0:
+            return ""
+        buffer = ctypes.create_unicode_buffer(length + 1)
+        user32.GetWindowTextW(handle, buffer, length + 1)
+        return buffer.value.strip()
+    except Exception:
+        return ""
+
+
+def matches_window(patterns: list[str], title: str) -> bool:
+    if not title or not patterns:
+        return False
+    candidate = title.casefold()
+    return any(fnmatch.fnmatchcase(candidate, pattern) for pattern in patterns)
+
+
+def games_file_mtime(path: Path) -> float | None:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return None
+
+
 def detect_games(
-    mappings: list[dict[str, Any]], running: set[str]
+    mappings: list[dict[str, Any]],
+    running: set[str],
+    window_title: str = "",
 ) -> list[dict[str, Any]]:
     detected: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -389,14 +449,21 @@ def detect_games(
         key = mapping["name"].casefold()
         if key in seen:
             continue
-        for process in mapping["processes"]:
-            if process in running:
-                game: dict[str, Any] = {"name": mapping["name"], "process": process}
-                if mapping.get("steam_app_id"):
-                    game["steam_app_id"] = mapping["steam_app_id"]
-                detected.append(game)
-                seen.add(key)
-                break
+        process = next(
+            (name for name in mapping["processes"] if name in running), None
+        )
+        if process is None and not matches_window(
+            mapping.get("window_titles") or [], window_title
+        ):
+            continue
+
+        game: dict[str, Any] = {"name": mapping["name"]}
+        if process:
+            game["process"] = process
+        if mapping.get("steam_app_id"):
+            game["steam_app_id"] = mapping["steam_app_id"]
+        detected.append(game)
+        seen.add(key)
 
     return detected
 
@@ -501,6 +568,7 @@ def main() -> int:
     )
 
     last_signature: tuple[str, ...] | None = None
+    games_mtime = games_file_mtime(args.config)
     failures = 0
     exit_code = 0
 
@@ -508,9 +576,27 @@ def main() -> int:
         while True:
             started = time.monotonic()
             delay = interval
+
+            mtime = games_file_mtime(args.config)
+            if mtime != games_mtime:
+                if mtime is None:
+                    LOGGER.warning("Fichier de jeux introuvable : %s", args.config)
+                else:
+                    try:
+                        mappings = load_game_mappings(args.config)
+                    except ValueError as exc:
+                        LOGGER.error("%s — liste précédente conservée.", exc)
+                    else:
+                        LOGGER.info(
+                            "%s jeu(x) surveillé(s) après rechargement de %s.",
+                            len(mappings),
+                            args.config.name,
+                        )
+                games_mtime = mtime
+
             try:
                 running = running_process_names()
-                detected = detect_games(mappings, running)
+                detected = detect_games(mappings, running, active_window_title())
                 if len(detected) > MAX_GAMES_PER_HEARTBEAT:
                     LOGGER.warning(
                         "%s jeux détectés : seuls les %s premiers sont envoyés.",

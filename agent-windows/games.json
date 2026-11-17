@@ -1,5 +1,5 @@
 {
-  "_comment": "Associez le nom du jeu aux exécutables détectés par psutil. Ajoutez vos propres jeux, puis relancez l'agent.",
+  "_comment": "Associez le nom du jeu aux exécutables détectés par psutil, ou à un titre de fenêtre (window_titles) pour les jeux lancés sous un hôte générique. L'agent recharge ce fichier automatiquement.",
   "games": [
     {
       "name": "Counter-Strike 2",
@@ -52,6 +52,10 @@
     {
       "name": "Minecraft (Bedrock)",
       "processes": ["minecraft.windows.exe"]
+    },
+    {
+      "name": "Minecraft (Java)",
+      "window_titles": ["Minecraft*"]
     }
   ]
 }
