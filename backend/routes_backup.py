@@ -11,6 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy import Boolean, Integer
 from starlette.background import BackgroundTask
 
 from database import SessionLocal, engine
@@ -126,12 +127,28 @@ def _restore_tables(tables: dict[str, list[dict[str, Any]]]) -> None:
             connection.execute(f'DELETE FROM "{table_name}"')
 
         for table_name in BACKUP_TABLES:
-            columns = _table_columns(table_name)
+            table = Base.metadata.tables[table_name]
+            columns = [column.name for column in table.columns]
             placeholders = ", ".join("?" for _ in columns)
             quoted_columns = ", ".join(f'"{column}"' for column in columns)
             rows = tables[table_name]
             for row in rows:
-                values = [row.get(column) for column in columns]
+                values = []
+                for column in table.columns:
+                    if column.name in row:
+                        values.append(row[column.name])
+                    elif column.default is not None and getattr(
+                        column.default, "is_scalar", False
+                    ):
+                        values.append(column.default.arg)
+                    elif column.nullable:
+                        values.append(None)
+                    elif isinstance(column.type, Boolean):
+                        values.append(False)
+                    elif isinstance(column.type, Integer):
+                        values.append(0)
+                    else:
+                        values.append("")
                 connection.execute(
                     f'INSERT INTO "{table_name}" ({quoted_columns}) VALUES ({placeholders})',
                     values,

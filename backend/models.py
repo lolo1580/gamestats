@@ -19,6 +19,7 @@ class Game(Base):
     name: Mapped[str] = mapped_column(String(255))
     name_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     steam_app_id: Mapped[int | None] = mapped_column(Integer, unique=True, nullable=True, index=True)
+    xbox_title_id: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True, index=True)
     cover_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     genres: Mapped[str | None] = mapped_column(Text, nullable=True)
     igdb_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -32,6 +33,13 @@ class Game(Base):
         DateTime(timezone=True), nullable=True
     )
     last_steam_play_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    xbox_achievements_total: Mapped[int] = mapped_column(Integer, default=0)
+    xbox_achievements_unlocked: Mapped[int] = mapped_column(Integer, default=0)
+    xbox_gamerscore: Mapped[int] = mapped_column(Integer, default=0)
+    xbox_gamerscore_total: Mapped[int] = mapped_column(Integer, default=0)
+    xbox_last_played_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 

@@ -81,6 +81,13 @@ class SettingsOut(BaseModel):
     influxdb_enabled: bool
     influxdb_configured: bool
     influxdb_last_export_at: str | None
+    xbox_client_id: str
+    xbox_refresh_token_hint: str
+    xbox_refresh_token_set: bool
+    xbox_gamertag: str
+    xbox_gamerscore: int
+    xbox_connected: bool
+    xbox_last_sync_at: str | None
 
 
 class SettingsUpdate(BaseModel):
@@ -96,6 +103,8 @@ class SettingsUpdate(BaseModel):
     influxdb_org: str | None = None
     influxdb_bucket: str | None = None
     influxdb_enabled: bool | None = None
+    xbox_client_id: str | None = None
+    xbox_refresh_token: str | None = None
 
 
 class AgentKeyOut(BaseModel):
@@ -112,6 +121,29 @@ class InfluxExportOut(BaseModel):
     sessions_exported: int | None = None
     points_written: int | None = None
     last_export_at: str | None = None
+
+
+class XboxDeviceCodeOut(BaseModel):
+    user_code: str
+    verification_uri: str
+    expires_in: int
+    interval: int
+
+
+class XboxPollOut(BaseModel):
+    status: Literal["pending", "connected", "expired", "error"]
+    message: str | None = None
+    gamertag: str | None = None
+    gamerscore: int | None = None
+    titles_synced: int | None = None
+
+
+class XboxSyncOut(BaseModel):
+    skipped: bool = False
+    reason: str | None = None
+    titles_synced: int | None = None
+    gamerscore: int | None = None
+    last_sync_at: str | None = None
 
 
 class HeartbeatGameIn(BaseModel):
@@ -144,6 +176,7 @@ class GameOut(BaseModel):
     id: int
     name: str
     steam_app_id: int | None
+    xbox_title_id: str | None
     cover_url: str | None
     genres: list[str]
     steam_playtime_minutes: int
@@ -151,6 +184,11 @@ class GameOut(BaseModel):
     achievements_total: int
     achievements_unlocked: int
     last_played_at: datetime | None
+    xbox_achievements_total: int
+    xbox_achievements_unlocked: int
+    xbox_gamerscore: int
+    xbox_gamerscore_total: int
+    xbox_last_played_at: datetime | None
 
 
 class TopGameOut(GameOut):

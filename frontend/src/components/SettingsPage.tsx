@@ -79,6 +79,14 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
   const [influxBucket, setInfluxBucket] = useState('')
   const [influxEnabled, setInfluxEnabled] = useState(false)
   const [influxBusy, setInfluxBusy] = useState(false)
+  const [xboxClientId, setXboxClientId] = useState('')
+  const [xboxDevice, setXboxDevice] = useState<{
+    user_code: string
+    verification_uri: string
+    expires_in: number
+    interval: number
+  } | null>(null)
+  const [xboxBusy, setXboxBusy] = useState(false)
 
   const [newUsername, setNewUsername] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -115,6 +123,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       setInfluxOrg(nextSettings.influxdb_org)
       setInfluxBucket(nextSettings.influxdb_bucket)
       setInfluxEnabled(nextSettings.influxdb_enabled)
+      setXboxClientId(nextSettings.xbox_client_id)
     } catch (loadError) {
       reportError(loadError)
     } finally {
@@ -161,6 +170,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
         influxdb_org: influxOrg.trim(),
         influxdb_bucket: influxBucket.trim(),
         influxdb_enabled: influxEnabled,
+        xbox_client_id: xboxClientId.trim(),
       }
       if (steamKey.trim()) payload.steam_api_key = steamKey.trim()
       if (igdbSecret.trim()) payload.igdb_client_secret = igdbSecret.trim()
@@ -175,6 +185,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       setInfluxOrg(next.influxdb_org)
       setInfluxBucket(next.influxdb_bucket)
       setInfluxEnabled(next.influxdb_enabled)
+      setXboxClientId(next.xbox_client_id)
       flash(t('settings.integrations.saved'))
     } catch (saveError) {
       reportError(saveError)
@@ -302,6 +313,102 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       setInfluxBusy(false)
     }
   }
+
+  const startXboxConnection = async () => {
+    if (!settings?.xbox_client_id) {
+      setError(t('settings.integrations.xboxSaveFirst'))
+      return
+    }
+    setXboxBusy(true)
+    setError(null)
+    try {
+      setXboxDevice(await api.startXboxDevice())
+    } catch (xboxError) {
+      reportError(xboxError)
+    } finally {
+      setXboxBusy(false)
+    }
+  }
+
+  const syncXboxNow = async () => {
+    setXboxBusy(true)
+    setError(null)
+    try {
+      const result = await api.syncXbox()
+      setSettings(await api.settings())
+      if (result.skipped) {
+        flash(result.reason ?? t('settings.integrations.xboxError'))
+      } else {
+        flash(
+          t('settings.integrations.xboxSynced', {
+            titles: result.titles_synced ?? 0,
+          }),
+        )
+      }
+    } catch (xboxError) {
+      reportError(xboxError)
+    } finally {
+      setXboxBusy(false)
+    }
+  }
+
+  const disconnectXbox = async () => {
+    if (!window.confirm(t('settings.integrations.xboxDisconnectConfirm'))) return
+    setXboxBusy(true)
+    setError(null)
+    try {
+      await api.disconnectXbox()
+      setSettings(await api.settings())
+      setXboxDevice(null)
+      flash(t('settings.integrations.xboxNotConnected'))
+    } catch (xboxError) {
+      reportError(xboxError)
+    } finally {
+      setXboxBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!xboxDevice) return
+    let stopped = false
+    let timer: number
+    const poll = async () => {
+      if (stopped) return
+      try {
+        const result = await api.pollXboxDevice()
+        if (stopped) return
+        if (result.status === 'connected') {
+          setXboxDevice(null)
+          setSettings(await api.settings())
+          flash(result.message ?? t('settings.integrations.xboxConnectedMessage'))
+          return
+        }
+        if (result.status === 'expired' || result.status === 'error') {
+          setXboxDevice(null)
+          reportError(result.message ?? t('settings.integrations.xboxError'))
+          return
+        }
+      } catch (pollError) {
+        if (!stopped) {
+          reportError(pollError)
+          setXboxDevice(null)
+        }
+        return
+      }
+      if (!stopped) {
+        timer = window.setTimeout(
+          poll,
+          Math.max(5, xboxDevice.interval) * 1000,
+        )
+      }
+    }
+
+    timer = window.setTimeout(poll, Math.max(5, xboxDevice.interval) * 1000)
+    return () => {
+      stopped = true
+      window.clearTimeout(timer)
+    }
+  }, [xboxDevice])
 
   const createUser = async (event: FormEvent) => {
     event.preventDefault()
@@ -815,6 +922,112 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               </div>
             </div>
 
+            <div className="settings-group">
+              <div className="settings-group__head">
+                <h3>{t('settings.integrations.xbox')}</h3>
+                <span
+                  className={`config-status${
+                    settings.xbox_connected ? ' is-on' : ' is-off'
+                  }`}
+                >
+                  {settings.xbox_connected
+                    ? t('settings.integrations.xboxConnected')
+                    : t('settings.integrations.xboxNotConnected')}
+                </span>
+              </div>
+              <p className="settings-hint">{t('settings.integrations.xboxSubtitle')}</p>
+
+              <label className="field">
+                <span>{t('settings.integrations.xboxClientId')}</span>
+                <input
+                  className="input"
+                  value={xboxClientId}
+                  onChange={(event) => setXboxClientId(event.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <small>{t('settings.integrations.xboxClientIdHint')}</small>
+              </label>
+
+              {settings.xbox_connected ? (
+                <div className="xbox-connected">
+                  <div className="xbox-metrics">
+                    <span>
+                      {t('settings.integrations.xboxGamerscore')}
+                      <strong>{settings.xbox_gamerscore}</strong>
+                    </span>
+                    {settings.xbox_gamertag && (
+                      <span>
+                        Gamertag
+                        <strong>{settings.xbox_gamertag}</strong>
+                      </span>
+                    )}
+                    <span>
+                      {t('settings.integrations.xboxLastSync')}
+                      <strong>
+                        {settings.xbox_last_sync_at
+                          ? formatRelative(settings.xbox_last_sync_at, lang)
+                          : t('common.never')}
+                      </strong>
+                    </span>
+                  </div>
+                  <div className="settings-actions">
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={syncXboxNow}
+                      disabled={xboxBusy}
+                    >
+                      <RefreshCw
+                        size={14}
+                        strokeWidth={2}
+                        className={xboxBusy ? 'is-spinning' : undefined}
+                      />
+                      {t('settings.integrations.xboxSync')}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--danger"
+                      onClick={disconnectXbox}
+                      disabled={xboxBusy}
+                    >
+                      {t('settings.integrations.xboxDisconnect')}
+                    </button>
+                  </div>
+                </div>
+              ) : xboxDevice ? (
+                <div className="xbox-device">
+                  <span>
+                    {t('settings.integrations.xboxCodeHint', {
+                      url: xboxDevice.verification_uri,
+                    })}
+                  </span>
+                  <strong>{xboxDevice.user_code}</strong>
+                  <a
+                    href={xboxDevice.verification_uri}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {xboxDevice.verification_uri}
+                    <ExternalLink size={12} />
+                  </a>
+                  <small>{t('settings.integrations.xboxWaiting')}</small>
+                </div>
+              ) : (
+                <div className="settings-actions">
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={startXboxConnection}
+                    disabled={xboxBusy || !settings.xbox_client_id}
+                  >
+                    <Globe2 size={14} strokeWidth={2} />
+                    {t('settings.integrations.xboxConnect')}
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button type="submit" className="button button--primary" disabled={saving}>
               <Save size={15} strokeWidth={2} />
               {t('settings.integrations.save')}
@@ -1257,6 +1470,21 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
             <p className="settings-hint">
               {t('settings.docs.influxHint')}
             </p>
+          </section>
+
+          <section className="panel settings-panel">
+            <header className="card-head">
+              <div>
+                <h2>{t('settings.docs.xboxTitle')}</h2>
+                <p>{t('settings.docs.xboxSubtitle')}</p>
+              </div>
+            </header>
+            <div className="docs-code">
+              <code>Azure app registration → Allow public client flows: Yes</code>
+              <code>Scopes: XboxLive.signin XboxLive.offline_access</code>
+              <code>Connect from Settings → Integrations → Xbox</code>
+            </div>
+            <p className="settings-hint">{t('settings.docs.xboxHint')}</p>
           </section>
         </div>
       )}

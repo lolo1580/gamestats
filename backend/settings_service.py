@@ -21,6 +21,15 @@ SETTING_INFLUX_ORG = "influxdb_org"
 SETTING_INFLUX_BUCKET = "influxdb_bucket"
 SETTING_INFLUX_ENABLED = "influxdb_enabled"
 SETTING_INFLUX_LAST_EXPORT = "influxdb_last_export_at"
+SETTING_XBOX_CLIENT_ID = "xbox_client_id"
+SETTING_XBOX_REFRESH_TOKEN = "xbox_refresh_token"
+SETTING_XBOX_GAMERTAG = "xbox_gamertag"
+SETTING_XBOX_XUID = "xbox_xuid"
+SETTING_XBOX_GAMERSCORE = "xbox_gamerscore"
+SETTING_XBOX_LAST_SYNC = "xbox_last_sync_at"
+SETTING_XBOX_DEVICE_CODE = "xbox_device_code"
+SETTING_XBOX_DEVICE_EXPIRES = "xbox_device_expires_at"
+SETTING_XBOX_DEVICE_INTERVAL = "xbox_device_interval"
 
 SECRET_SETTINGS = {
     SETTING_AGENT_API_KEY,
@@ -28,6 +37,8 @@ SECRET_SETTINGS = {
     SETTING_IGDB_CLIENT_SECRET,
     SETTING_HOMEPAGE_API_TOKEN,
     SETTING_INFLUX_TOKEN,
+    SETTING_XBOX_REFRESH_TOKEN,
+    SETTING_XBOX_DEVICE_CODE,
 }
 
 SETTING_DEFAULTS = {
@@ -44,6 +55,15 @@ SETTING_DEFAULTS = {
     SETTING_INFLUX_BUCKET: lambda: "",
     SETTING_INFLUX_ENABLED: lambda: "false",
     SETTING_INFLUX_LAST_EXPORT: lambda: "",
+    SETTING_XBOX_CLIENT_ID: lambda: get_settings().xbox_client_id,
+    SETTING_XBOX_REFRESH_TOKEN: lambda: "",
+    SETTING_XBOX_GAMERTAG: lambda: "",
+    SETTING_XBOX_XUID: lambda: "",
+    SETTING_XBOX_GAMERSCORE: lambda: "0",
+    SETTING_XBOX_LAST_SYNC: lambda: "",
+    SETTING_XBOX_DEVICE_CODE: lambda: "",
+    SETTING_XBOX_DEVICE_EXPIRES: lambda: "",
+    SETTING_XBOX_DEVICE_INTERVAL: lambda: "5",
 }
 
 
@@ -61,6 +81,11 @@ class IntegrationSettings:
     influxdb_org: str
     influxdb_bucket: str
     influxdb_enabled: bool
+    xbox_client_id: str
+    xbox_refresh_token: str
+    xbox_gamertag: str
+    xbox_xuid: str
+    xbox_gamerscore: int
 
     @property
     def steam_configured(self) -> bool:
@@ -78,6 +103,10 @@ class IntegrationSettings:
             and self.influxdb_org
             and self.influxdb_bucket
         )
+
+    @property
+    def xbox_connected(self) -> bool:
+        return bool(self.xbox_client_id and self.xbox_refresh_token and self.xbox_xuid)
 
 
 def ensure_default_settings(db: Session) -> None:
@@ -99,6 +128,13 @@ def get_setting(db: Session, key: str, default: str | None = None) -> str:
     return row.value or ""
 
 
+def _int_setting(db: Session, key: str) -> int:
+    try:
+        return int(get_setting(db, key, "0") or 0)
+    except ValueError:
+        return 0
+
+
 def get_integration_settings(db: Session) -> IntegrationSettings:
     settings = get_settings()
     return IntegrationSettings(
@@ -117,6 +153,13 @@ def get_integration_settings(db: Session) -> IntegrationSettings:
         influxdb_bucket=get_setting(db, SETTING_INFLUX_BUCKET, ""),
         influxdb_enabled=get_setting(db, SETTING_INFLUX_ENABLED, "false").lower()
         == "true",
+        xbox_client_id=get_setting(
+            db, SETTING_XBOX_CLIENT_ID, get_settings().xbox_client_id
+        ),
+        xbox_refresh_token=get_setting(db, SETTING_XBOX_REFRESH_TOKEN, ""),
+        xbox_gamertag=get_setting(db, SETTING_XBOX_GAMERTAG, ""),
+        xbox_xuid=get_setting(db, SETTING_XBOX_XUID, ""),
+        xbox_gamerscore=_int_setting(db, SETTING_XBOX_GAMERSCORE),
     )
 
 

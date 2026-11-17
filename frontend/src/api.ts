@@ -11,6 +11,9 @@ import type {
   SettingsUpdatePayload,
   Summary,
   TopGame,
+  XboxDeviceCode,
+  XboxPollResult,
+  XboxSyncResult,
   UserRole,
 } from './types'
 
@@ -177,6 +180,11 @@ export const api = {
     post<{ homepage_api_token: string }>('/settings/homepage-token/rotate'),
   exportInflux: () =>
     post<InfluxExportResult>('/admin/influxdb/export'),
+
+  startXboxDevice: () => post<XboxDeviceCode>('/xbox/device-code'),
+  pollXboxDevice: () => post<XboxPollResult>('/xbox/device-code/poll'),
+  syncXbox: () => post<XboxSyncResult>('/xbox/sync'),
+  disconnectXbox: () => post<{ ok: boolean }>('/xbox/disconnect'),
 
   downloadBackup: (format: 'json' | 'sqlite') =>
     download(`/admin/backup/export/${format}`),

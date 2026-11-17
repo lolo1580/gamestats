@@ -43,6 +43,13 @@ export interface AppSettings {
   influxdb_enabled: boolean
   influxdb_configured: boolean
   influxdb_last_export_at: string | null
+  xbox_client_id: string
+  xbox_refresh_token_hint: string
+  xbox_refresh_token_set: boolean
+  xbox_gamertag: string
+  xbox_gamerscore: number
+  xbox_connected: boolean
+  xbox_last_sync_at: string | null
 }
 
 export interface SettingsUpdatePayload {
@@ -58,6 +65,31 @@ export interface SettingsUpdatePayload {
   influxdb_org?: string
   influxdb_bucket?: string
   influxdb_enabled?: boolean
+  xbox_client_id?: string
+  xbox_refresh_token?: string
+}
+
+export interface XboxDeviceCode {
+  user_code: string
+  verification_uri: string
+  expires_in: number
+  interval: number
+}
+
+export interface XboxPollResult {
+  status: 'pending' | 'connected' | 'expired' | 'error'
+  message: string | null
+  gamertag: string | null
+  gamerscore: number | null
+  titles_synced: number | null
+}
+
+export interface XboxSyncResult {
+  skipped: boolean
+  reason: string | null
+  titles_synced: number | null
+  gamerscore: number | null
+  last_sync_at: string | null
 }
 
 export interface InfluxExportResult {
@@ -72,6 +104,7 @@ export interface Game {
   id: number
   name: string
   steam_app_id: number | null
+  xbox_title_id: string | null
   cover_url: string | null
   genres: string[]
   steam_playtime_minutes: number
@@ -79,6 +112,11 @@ export interface Game {
   achievements_total: number
   achievements_unlocked: number
   last_played_at: string | null
+  xbox_achievements_total: number
+  xbox_achievements_unlocked: number
+  xbox_gamerscore: number
+  xbox_gamerscore_total: number
+  xbox_last_played_at: string | null
 }
 
 export interface TopGame extends Game {

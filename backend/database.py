@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from config import get_settings
@@ -53,6 +53,38 @@ def init_db() -> None:
     import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _ensure_sqlite_columns()
+
+
+def _ensure_sqlite_columns() -> None:
+    """Lightweight migrations for columns added after the first release.
+
+    ``create_all`` creates missing tables but never adds columns to existing
+    tables. SQLite is the supported database, so a targeted ALTER is enough.
+    """
+
+    if not _is_sqlite:
+        return
+    inspector = inspect(engine)
+    if "games" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("games")}
+    additions = {
+        "xbox_title_id": "VARCHAR(32)",
+        "xbox_achievements_total": "INTEGER NOT NULL DEFAULT 0",
+        "xbox_achievements_unlocked": "INTEGER NOT NULL DEFAULT 0",
+        "xbox_gamerscore": "INTEGER NOT NULL DEFAULT 0",
+        "xbox_gamerscore_total": "INTEGER NOT NULL DEFAULT 0",
+        "xbox_last_played_at": "DATETIME",
+    }
+    with engine.begin() as connection:
+        for name, ddl in additions.items():
+            if name not in existing:
+                connection.exec_driver_sql(f'ALTER TABLE games ADD COLUMN "{name}" {ddl}')
+        connection.exec_driver_sql(
+            'CREATE UNIQUE INDEX IF NOT EXISTS "ix_games_xbox_title_id" '
+            'ON "games" ("xbox_title_id")'
+        )
 
 
 def get_db():

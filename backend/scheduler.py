@@ -8,6 +8,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from collectors.igdb import enrich_games
 from collectors.steam import sync_steam_library
+from collectors.xbox import sync_xbox_library
 from config import get_settings
 from database import SessionLocal
 from heartbeat import close_stale_agent_sessions
@@ -65,6 +66,16 @@ def _influx_job() -> None:
         logger.exception("Échec de l'export InfluxDB.")
 
 
+def _xbox_job() -> None:
+    try:
+        with SessionLocal() as db:
+            result = sync_xbox_library(db)
+            if result.get("skipped"):
+                logger.debug("Sync Xbox ignorée : %s", result.get("reason"))
+    except Exception:
+        logger.exception("Échec de la synchronisation Xbox.")
+
+
 def start_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is not None:
@@ -104,14 +115,22 @@ def start_scheduler() -> BackgroundScheduler:
         name="Export InfluxDB",
         next_run_time=utcnow() + timedelta(seconds=45),
     )
+    scheduler.add_job(
+        _xbox_job,
+        IntervalTrigger(minutes=max(10, settings.xbox_sync_minutes)),
+        id="sync-xbox",
+        name="Synchronisation Xbox",
+        next_run_time=utcnow() + timedelta(seconds=60),
+    )
 
     scheduler.start()
     _scheduler = scheduler
     logger.info(
-        "Planificateur démarré (Steam: %s min, IGDB: %s min, InfluxDB: %s min, configuration via /api/settings).",
+        "Planificateur démarré (Steam: %s min, IGDB: %s min, InfluxDB: %s min, Xbox: %s min, configuration via /api/settings).",
         max(5, settings.steam_sync_minutes),
         max(15, settings.igdb_sync_minutes),
         max(5, settings.influx_export_minutes),
+        max(10, settings.xbox_sync_minutes),
     )
     return scheduler
 

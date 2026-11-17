@@ -4,8 +4,15 @@ from datetime import timedelta
 import httpx
 
 import influx as influx_module
+from collectors import xbox as xbox_module
+from collectors.xbox import parse_titles
 from database import SessionLocal
 from models import Game, GameSession, utcnow
+from settings_service import (
+    SETTING_XBOX_CLIENT_ID,
+    SETTING_XBOX_REFRESH_TOKEN,
+    update_settings,
+)
 
 
 def heartbeat_payload(games=None):
@@ -404,3 +411,110 @@ def test_viewer_cannot_access_settings_or_users(anon_client, admin_credentials):
     assert anon_client.get("/api/settings").status_code == 403
     assert anon_client.get("/api/users").status_code == 403
     assert anon_client.get("/api/stats/summary").status_code == 200
+
+def test_xbox_parse_title_history():
+    titles = parse_titles(
+        {
+            "titles": [
+                {
+                    "titleId": "1234",
+                    "name": "Halo Infinite",
+                    "type": "Game",
+                    "achievement": {
+                        "currentAchievements": 4,
+                        "totalAchievements": 10,
+                        "currentGamerscore": 80,
+                        "totalGamerscore": 200,
+                    },
+                    "titleHistory": {"lastTimePlayed": "2026-11-16T21:15:00.000Z"},
+                    "displayImage": "https://images.example/halo.jpg",
+                },
+                {"titleId": "999", "name": "DLC", "type": "Dlc"},
+            ]
+        }
+    )
+    assert len(titles) == 1
+    assert titles[0]["title_id"] == "1234"
+    assert titles[0]["achievements_total"] == 10
+    assert titles[0]["achievements_unlocked"] == 4
+    assert titles[0]["gamerscore"] == 80
+    assert titles[0]["last_played_at"] is not None
+
+
+def test_xbox_endpoints_without_connection(client):
+    start = client.post("/api/xbox/device-code")
+    assert start.status_code == 400
+
+    sync = client.post("/api/xbox/sync")
+    assert sync.status_code == 200
+    assert sync.json()["skipped"] is True
+
+
+def test_xbox_sync_maps_titles_to_library(client, monkeypatch):
+    with SessionLocal() as db:
+        update_settings(
+            db,
+            {
+                SETTING_XBOX_CLIENT_ID: "azure-client-id",
+                SETTING_XBOX_REFRESH_TOKEN: "refresh-token",
+            },
+        )
+
+    monkeypatch.setattr(
+        xbox_module,
+        "refresh_microsoft_token",
+        lambda *_: {"access_token": "ms-access", "refresh_token": "new-refresh"},
+    )
+    monkeypatch.setattr(
+        xbox_module,
+        "authenticate_xbox",
+        lambda *_: {"xuid": "123", "userhash": "uhs", "token": "xsts"},
+    )
+    monkeypatch.setattr(
+        xbox_module,
+        "fetch_profile",
+        lambda *_: {"gamertag": "Player One", "gamerscore": 1234},
+    )
+    monkeypatch.setattr(
+        xbox_module,
+        "fetch_title_history",
+        lambda *_: {
+            "titles": [
+                {
+                    "titleId": "1234",
+                    "name": "Halo Infinite",
+                    "type": "Game",
+                    "achievement": {
+                        "currentAchievements": 4,
+                        "totalAchievements": 10,
+                        "currentGamerscore": 80,
+                        "totalGamerscore": 200,
+                    },
+                    "titleHistory": {"lastTimePlayed": "2026-11-16T21:15:00.000Z"},
+                    "displayImage": "https://images.example/halo.jpg",
+                }
+            ]
+        },
+    )
+
+    with SessionLocal() as db:
+        result = xbox_module.sync_xbox_library(db)
+
+    assert result["skipped"] is False
+    assert result["titles_synced"] == 1
+    assert result["gamerscore"] == 1234
+
+    games = client.get("/api/games").json()
+    assert len(games) == 1
+    game = games[0]
+    assert game["name"] == "Halo Infinite"
+    assert game["xbox_title_id"] == "1234"
+    assert game["xbox_achievements_unlocked"] == 4
+    assert game["xbox_achievements_total"] == 10
+    assert game["xbox_gamerscore"] == 80
+    assert game["xbox_gamerscore_total"] == 200
+
+    settings = client.get("/api/settings").json()
+    assert settings["xbox_connected"] is True
+    assert settings["xbox_gamertag"] == "Player One"
+    assert settings["xbox_gamerscore"] == 1234

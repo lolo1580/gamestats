@@ -40,15 +40,18 @@ export function Library({ games, loading }: LibraryProps) {
         )
       : games
 
+    const lastPlayed = (game: Game) =>
+      Math.max(
+        new Date(game.last_played_at ?? 0).getTime(),
+        new Date(game.xbox_last_played_at ?? 0).getTime(),
+      )
+
     return [...filtered].sort((left, right) => {
       if (sort === 'name') {
         return left.name.localeCompare(right.name, lang === 'fr' ? 'fr' : 'en')
       }
       if (sort === 'recent') {
-        return (
-          new Date(right.last_played_at ?? 0).getTime() -
-          new Date(left.last_played_at ?? 0).getTime()
-        )
+        return lastPlayed(right) - lastPlayed(left)
       }
       return right.steam_playtime_minutes - left.steam_playtime_minutes
     })
@@ -133,18 +136,38 @@ export function Library({ games, loading }: LibraryProps) {
       ) : (
         <div className="library-grid">
           {visibleGames.map((game) => {
+            const hasSteamAchievements = game.achievements_total > 0
+            const achievementsTotal = hasSteamAchievements
+              ? game.achievements_total
+              : game.xbox_achievements_total
+            const achievementsUnlocked = hasSteamAchievements
+              ? game.achievements_unlocked
+              : game.xbox_achievements_unlocked
+            const achievementsSource = hasSteamAchievements
+              ? t('library.achievementsLabel')
+              : t('library.achievementsXbox')
             const progress =
-              game.achievements_total > 0
-                ? Math.round((game.achievements_unlocked / game.achievements_total) * 100)
+              achievementsTotal > 0
+                ? Math.round((achievementsUnlocked / achievementsTotal) * 100)
                 : 0
 
             return (
               <article key={game.id} className="game-card">
                 <div className="game-card__media">
                   <Cover src={game.cover_url} name={game.name} className="game-cover" />
-                  <span className="game-card__playtime">
-                    {formatPlaytime(game.steam_playtime_minutes, lang)}
-                  </span>
+                  {game.xbox_title_id && (
+                    <span className="game-card__platform">{t('library.xboxBadge')}</span>
+                  )}
+                  {game.steam_playtime_minutes > 0 && (
+                    <span className="game-card__playtime">
+                      {formatPlaytime(game.steam_playtime_minutes, lang)}
+                    </span>
+                  )}
+                  {game.xbox_title_id && game.xbox_gamerscore > 0 && (
+                    <span className="game-card__gamerscore">
+                      {t('library.gamerscore', { score: game.xbox_gamerscore })}
+                    </span>
+                  )}
                   {game.playtime_2weeks_minutes > 0 && (
                     <span className="game-card__recent">
                       {t('library.recentBadge', {
@@ -160,15 +183,15 @@ export function Library({ games, loading }: LibraryProps) {
                     {game.genres.slice(0, 2).join(' · ') || t('library.unknownGenre')}
                   </p>
 
-                  {game.achievements_total > 0 ? (
+                  {achievementsTotal > 0 ? (
                     <div className="achievements">
                       <div className="achievements__label">
                         <span>
                           <Trophy size={11} strokeWidth={2.2} />
-                          {t('library.achievementsLabel')}
+                          {achievementsSource}
                         </span>
                         <span>
-                          {game.achievements_unlocked}/{game.achievements_total}
+                          {achievementsUnlocked}/{achievementsTotal}
                         </span>
                       </div>
                       <div className="achievements__bar" aria-hidden="true">

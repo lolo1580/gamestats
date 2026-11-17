@@ -24,6 +24,12 @@ from settings_service import (
     SETTING_STEAM_API_KEY,
     SETTING_STEAM_ID,
     SETTING_TIMEZONE,
+    SETTING_XBOX_CLIENT_ID,
+    SETTING_XBOX_GAMERSCORE,
+    SETTING_XBOX_GAMERTAG,
+    SETTING_XBOX_LAST_SYNC,
+    SETTING_XBOX_REFRESH_TOKEN,
+    SETTING_XBOX_XUID,
     get_integration_settings,
     get_setting,
     mask_secret,
@@ -58,6 +64,13 @@ def _settings_out(db: Session) -> SettingsOut:
         influxdb_enabled=integration.influxdb_enabled,
         influxdb_configured=integration.influxdb_configured,
         influxdb_last_export_at=last_export,
+        xbox_client_id=integration.xbox_client_id,
+        xbox_refresh_token_hint=mask_secret(integration.xbox_refresh_token),
+        xbox_refresh_token_set=bool(integration.xbox_refresh_token),
+        xbox_gamertag=integration.xbox_gamertag,
+        xbox_gamerscore=integration.xbox_gamerscore,
+        xbox_connected=integration.xbox_connected,
+        xbox_last_sync_at=get_setting(db, SETTING_XBOX_LAST_SYNC) or None,
     )
 
 
@@ -137,6 +150,15 @@ def write_settings(
         updates[SETTING_INFLUX_ENABLED] = (
             "true" if payload.influxdb_enabled else "false"
         )
+    if "xbox_client_id" in fields:
+        updates[SETTING_XBOX_CLIENT_ID] = (payload.xbox_client_id or "").strip()
+    if "xbox_refresh_token" in fields:
+        token = (payload.xbox_refresh_token or "").strip()
+        updates[SETTING_XBOX_REFRESH_TOKEN] = token
+        if not token:
+            updates[SETTING_XBOX_XUID] = ""
+            updates[SETTING_XBOX_GAMERTAG] = ""
+            updates[SETTING_XBOX_GAMERSCORE] = "0"
 
     current = get_integration_settings(db)
     prospective_url = updates.get(SETTING_INFLUX_URL, current.influxdb_url)

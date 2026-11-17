@@ -23,6 +23,7 @@ def game_payload(game: Game) -> dict:
         "id": game.id,
         "name": game.name,
         "steam_app_id": game.steam_app_id,
+        "xbox_title_id": game.xbox_title_id,
         "cover_url": game.cover_url,
         "genres": parse_genres(game.genres),
         "steam_playtime_minutes": game.steam_playtime_minutes or 0,
@@ -30,6 +31,11 @@ def game_payload(game: Game) -> dict:
         "achievements_total": game.achievements_total or 0,
         "achievements_unlocked": game.achievements_unlocked or 0,
         "last_played_at": iso_utc(game.last_steam_play_at),
+        "xbox_achievements_total": game.xbox_achievements_total or 0,
+        "xbox_achievements_unlocked": game.xbox_achievements_unlocked or 0,
+        "xbox_gamerscore": game.xbox_gamerscore or 0,
+        "xbox_gamerscore_total": game.xbox_gamerscore_total or 0,
+        "xbox_last_played_at": iso_utc(game.xbox_last_played_at),
     }
 
 

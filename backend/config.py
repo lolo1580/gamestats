@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     steam_sync_minutes: int = 15
     igdb_sync_minutes: int = 60
     influx_export_minutes: int = 15
+    xbox_sync_minutes: int = 30
+    xbox_client_id: str = ""
     igdb_enrich_limit: int = 8
     steam_achievement_limit: int = 8
     session_days: int = 7

@@ -7,6 +7,9 @@ covers and genres from IGDB.
 
 The interface ships in **French and English**, with **dark and light themes**.
 
+Supported sources: **PC agent**, **Steam**, **Xbox** (achievements, gamerscore,
+and recent games), and **IGDB** metadata.
+
 ## Features
 
 - **Real-time sessions** — the Windows agent sends a heartbeat every 30 seconds;
@@ -15,6 +18,10 @@ The interface ships in **French and English**, with **dark and light themes**.
   annual heatmap, top games, and recent sessions.
 - **Steam library sync** — owned games, total and two-week playtime, last played
   dates, and achievement progress. Playtime deltas become approximate sessions.
+- **Xbox library sync** — achievements, gamerscore, and recent games through the
+  Xbox Web API, with a passwordless Azure device-code connection. Xbox does not
+  expose reliable per-game playtime; PC playtime continues to come from the
+  agent.
 - **Double-count protection** — Steam playtime deltas already covered by an
   agent session are ignored.
 - **IGDB enrichment** — HD covers and genres for games that do not have them yet.
@@ -27,8 +34,8 @@ The interface ships in **French and English**, with **dark and light themes**.
   stored in the browser and on the user account.
 - **Accounts and roles** — first-run admin setup, login/logout, local sessions,
   user management, and `admin` / `viewer` roles.
-- **Backend settings** — manage the agent key, timezone, Steam and IGDB
-  credentials from the UI. Secrets are masked in responses.
+- **Backend settings** — manage the agent key, timezone, Steam, IGDB, Homepage,
+  InfluxDB, and Xbox integration from the UI. Secrets are masked in responses.
 - **Backups** — export a readable JSON snapshot or a full SQLite database, then
   restore either format from the settings page.
 - **Homepage widget API** — a token-protected JSON endpoint ready for the
@@ -60,8 +67,9 @@ frontend (React/nginx) ◄──────── GET /api/* ──────
   state. Agent sessions are closed after `AGENT_STALE_SECONDS` without a
   heartbeat.
 - **Scheduler** closes stale sessions every minute, syncs Steam every 15 minutes,
-  enriches IGDB data every 60 minutes, and exports InfluxDB points every
-  15 minutes. Run a single uvicorn worker so the scheduler is not duplicated.
+  enriches IGDB data every 60 minutes, exports InfluxDB points every 15 minutes,
+  and syncs Xbox every 30 minutes. Run a single uvicorn worker so the scheduler
+  is not duplicated.
 - **Frontend** is a React/Vite SPA served by nginx. `/api` is proxied to the
   backend.
 
@@ -104,12 +112,14 @@ Copy `.env.example` to `.env` and adjust the values:
 | `STEAM_ID`              | empty                | Initial SteamID64. Editable in Settings.                           |
 | `IGDB_CLIENT_ID`        | empty                | Initial Twitch client ID. Editable in Settings.                    |
 | `IGDB_CLIENT_SECRET`    | empty                | Initial Twitch client secret. Editable in Settings.                |
+| `XBOX_CLIENT_ID`        | empty                | Azure application client ID for the Xbox device-code flow.         |
 | `FRONTEND_PORT`         | `8090`               | Host port for the dashboard.                                       |
 | `BACKEND_PORT`          | `8091`               | Host port for the API (must be reachable by the agent).            |
 | `AGENT_STALE_SECONDS`   | `180`                | Time without a heartbeat before an agent session is closed.        |
 | `STEAM_SYNC_MINUTES`    | `15`                 | Steam synchronization interval.                                    |
 | `IGDB_SYNC_MINUTES`     | `60`                 | IGDB enrichment interval.                                          |
 | `INFLUX_EXPORT_MINUTES` | `15`                 | InfluxDB export interval.                                          |
+| `XBOX_SYNC_MINUTES`     | `30`                 | Xbox synchronization interval.                                     |
 | `SESSION_DAYS`          | `7`                  | Browser session lifetime, in days.                                |
 | `COOKIE_SECURE`         | `false`              | Set to `true` when serving the app over HTTPS.                     |
 | `SCHEDULER_ENABLED`     | `true`               | Set to `false` to disable background jobs.                         |
@@ -154,6 +164,26 @@ Enrichment starts with the next scheduled job; no restart is required.
 
 Games without covers or genres are enriched in small batches (8 per hour by
 default) so the Steam sync is never blocked by IGDB rate limits.
+
+## Xbox setup
+
+Xbox support is optional and does **not** import playtime: the Xbox API does not
+expose reliable per-game playtime. It imports achievements, gamerscore, recent
+games, and cover images where available. PC playtime is still measured by the
+Windows agent.
+
+1. In the Microsoft Entra admin center, create an **App registration**.
+2. Choose an account type that supports **personal Microsoft accounts**.
+3. Under **Authentication**, enable **Allow public client flows** (device code).
+4. Copy the **Application (client) ID** into **Settings → Intégrations → Xbox**
+   (or set `XBOX_CLIENT_ID` before the first start).
+5. Save, click **Connect Xbox**, open `https://microsoft.com/link`, and enter
+   the displayed code. Approve the `XboxLive.signin` and
+   `XboxLive.offline_access` scopes.
+6. GameStats stores only a refresh token and automatically syncs every
+   30 minutes.
+
+The connection can be revoked from the Xbox section of the settings page.
 
 ## Windows agent
 
@@ -250,6 +280,10 @@ not be visible. Check the log file if nothing appears in the dashboard.
 | `POST` | `/api/admin/backup/restore/sqlite` | Restore a SQLite backup (admin)         |
 | `GET`  | `/api/homepage`          | Homepage widget JSON (`X-API-Key` or token)      |
 | `POST` | `/api/admin/influxdb/export` | Export sessions and metrics to InfluxDB     |
+| `POST` | `/api/xbox/device-code`  | Start the Xbox device-code flow (admin)          |
+| `POST` | `/api/xbox/device-code/poll` | Poll/complete the Xbox connection (admin)    |
+| `POST` | `/api/xbox/sync`         | Force an Xbox synchronization (admin)            |
+| `POST` | `/api/xbox/disconnect`   | Disconnect the Xbox account (admin)              |
 | `POST` | `/api/admin/sync/steam`   | Force a Steam sync (admin session)               |
 | `POST` | `/api/admin/enrich/igdb`  | Force IGDB enrichment (admin session)            |
 
@@ -329,6 +363,8 @@ gamestats/
 │   ├── routes_homepage.py   # gethomepage.dev widget API
 │   ├── routes_influx.py     # Manual InfluxDB export
 │   ├── influx.py            # InfluxDB line-protocol exporter
+│   ├── routes_xbox.py       # Xbox device-code connection and sync
+│   ├── collectors/xbox.py   # Xbox Live API client and parser
 │   ├── heartbeat.py         # Agent session lifecycle
 │   ├── stats.py             # Summary, daily, heatmap, top games
 │   ├── scheduler.py         # Background jobs
@@ -409,6 +445,8 @@ npm run build
   the `data` directory and backups accordingly. Backups include password hashes
   and integration secrets; store them securely.
 - Homepage and InfluxDB tokens are stored in SQLite and masked in API responses.
+- The Xbox refresh token is stored in SQLite, masked in API responses, and can
+  be revoked by disconnecting the account.
 - The default `AGENT_API_KEY` is `change-me`; change it before exposing the
   service on a network.
 - `.env`, the SQLite database, and local build artifacts are excluded from Git.
@@ -421,6 +459,8 @@ npm run build
   To start over, stop the stack and remove the `data` directory.
 - The current design targets a single PC agent. Multiple agents reporting the
   same game create separate sessions.
+- Xbox data does not include reliable playtime; only achievements, gamerscore,
+  and recent games are synchronized.
 - Restoring a backup replaces users, games, sessions, settings, and invalidates
   current login sessions.
 - InfluxDB exports are incremental and idempotent by point timestamp; changing

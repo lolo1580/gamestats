@@ -3059,3 +3059,103 @@ code {
   font-size: 9.5px;
   line-height: 1.55;
 }
+
+.xbox-connected {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.xbox-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.xbox-metrics > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+.xbox-metrics strong {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.xbox-device {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(76, 141, 255, 0.18);
+  border-radius: 8px;
+}
+
+.xbox-device > span,
+.xbox-device > small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.xbox-device > strong {
+  color: var(--accent-hover);
+  font-family: var(--mono);
+  font-size: 19px;
+  letter-spacing: 0.08em;
+}
+
+.xbox-device > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-hover);
+  font-size: 10.5px;
+  text-decoration: none;
+}
+
+.xbox-device > a:hover {
+  text-decoration: underline;
+}
+
+.game-card__platform {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  padding: 3px 6px;
+  color: #d7e8ff;
+  background: rgba(8, 13, 20, 0.86);
+  border: 1px solid rgba(76, 141, 255, 0.24);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+  backdrop-filter: blur(6px);
+}
+
+.game-card__gamerscore {
+  position: absolute;
+  left: 7px;
+  bottom: 7px;
+  padding: 3px 6px;
+  color: var(--text);
+  background: rgba(8, 13, 20, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  backdrop-filter: blur(6px);
+}
+
+.game-card__playtime + .game-card__gamerscore {
+  display: none;
+}

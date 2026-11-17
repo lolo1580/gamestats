@@ -34,10 +34,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   15 minutes and available on demand, with a stored export watermark.
 - InfluxDB and Homepage settings sections with masked tokens and integration
   status.
+- Xbox integration via passwordless Azure device-code flow, with achievements,
+  gamerscore, recent games, cover images, and a 30-minute sync.
+- Xbox-specific game fields and library badges, plus a disconnect action.
 
 ### Changed
 
-- Settings integrations now cover Steam, IGDB, Homepage, and InfluxDB.
+- Settings integrations now cover Steam, IGDB, Homepage, InfluxDB, and Xbox.
+- The SQLite schema now migrates new Xbox columns on existing game tables.
 - Dashboard, library, sessions, stats, agents, user, and settings endpoints now
   require an authenticated session.
 - Admin sync/enrichment endpoints now require an administrator session instead
