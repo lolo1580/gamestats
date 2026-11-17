@@ -13,6 +13,7 @@ import argparse
 import fnmatch
 import json
 import logging
+import ntpath
 import os
 import socket
 import sys
@@ -338,7 +339,7 @@ def load_game_mappings(path: Path) -> list[dict[str, Any]]:
 
         normalized = sorted(
             {
-                Path(str(process).strip()).name.casefold()
+                ntpath.basename(str(process).strip()).casefold()
                 for process in processes
                 if str(process).strip()
             }
