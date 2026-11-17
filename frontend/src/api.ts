@@ -12,6 +12,7 @@ import type {
   GogResult,
   HeatmapData,
   InfluxExportResult,
+  MetadataSyncResult,
   SettingsUpdatePayload,
   Summary,
   TopGame,
@@ -204,6 +205,7 @@ export const api = {
   connectEpic: (code: string) => post<EpicResult>('/epic/connect', { code }),
   syncEpic: () => post<EpicResult>('/epic/sync'),
   disconnectEpic: () => post<{ ok: boolean }>('/epic/disconnect'),
+  syncMetadata: () => post<MetadataSyncResult>('/metadata/sync'),
 
   downloadBackup: (format: 'json' | 'sqlite') =>
     download(`/admin/backup/export/${format}`),

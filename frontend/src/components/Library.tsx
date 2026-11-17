@@ -206,6 +206,74 @@ export function Library({ games, loading }: LibraryProps) {
                     {game.genres.slice(0, 2).join(' · ') || t('library.unknownGenre')}
                   </p>
 
+                  {(game.opencritic_score != null ||
+                    game.mobygames_score != null ||
+                    game.hltb_main_minutes > 0) && (
+                    <div className="game-card__scores">
+                      {game.opencritic_score != null && (
+                        <a
+                          className="score-pill score-pill--oc"
+                          href={game.opencritic_url ?? undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={t('library.opencriticTooltip', {
+                            score: Math.round(game.opencritic_score),
+                            tier: game.opencritic_tier ?? '—',
+                            reviews: game.opencritic_reviews,
+                          })}
+                        >
+                          OC <strong>{Math.round(game.opencritic_score)}</strong>
+                        </a>
+                      )}
+                      {game.mobygames_score != null && (
+                        <a
+                          className="score-pill score-pill--moby"
+                          href={game.mobygames_url ?? undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={t('library.mobygamesTooltip', {
+                            score: game.mobygames_score.toFixed(1),
+                            votes: game.mobygames_num_votes,
+                          })}
+                        >
+                          Moby <strong>{game.mobygames_score.toFixed(1)}</strong>
+                        </a>
+                      )}
+                      {game.hltb_main_minutes > 0 && (
+                        <a
+                          className="score-pill score-pill--hltb"
+                          href={game.hltb_url ?? undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={t('library.hltbTooltip', {
+                            main: formatPlaytime(game.hltb_main_minutes, lang),
+                            extra: formatPlaytime(
+                              game.hltb_main_extra_minutes,
+                              lang,
+                            ),
+                            complete: formatPlaytime(
+                              game.hltb_completionist_minutes,
+                              lang,
+                            ),
+                          })}
+                        >
+                          <Clock3 size={10} strokeWidth={2} />
+                          {t('library.hltbMain', {
+                            duration: formatPlaytime(
+                              game.hltb_main_minutes,
+                              lang,
+                            ),
+                          })}
+                        </a>
+                      )}
+                      {game.release_date && (
+                        <span className="score-pill score-pill--year">
+                          {game.release_date.slice(0, 4)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {game.ubisoft_space_id && (
                     <span className="game-card__ubisoft">
                       {t('library.ubisoftSessions', {

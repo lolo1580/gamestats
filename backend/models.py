@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -63,6 +63,35 @@ class Game(Base):
     epic_achievements_total: Mapped[int] = mapped_column(Integer, default=0)
     epic_achievements_unlocked: Mapped[int] = mapped_column(Integer, default=0)
     epic_achievements_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    release_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    mobygames_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, index=True
+    )
+    mobygames_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mobygames_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mobygames_num_votes: Mapped[int] = mapped_column(Integer, default=0)
+    mobygames_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    opencritic_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, index=True
+    )
+    opencritic_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    opencritic_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    opencritic_tier: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    opencritic_reviews: Mapped[int] = mapped_column(Integer, default=0)
+    opencritic_recommended: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    opencritic_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    hltb_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    hltb_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hltb_main_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    hltb_main_extra_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    hltb_completionist_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    hltb_checked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 

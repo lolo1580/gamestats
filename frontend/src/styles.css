@@ -3186,3 +3186,63 @@ textarea.input {
   font-size: 11px;
   line-height: 1.5;
 }
+
+.game-card__scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.score-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 8px;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.score-pill strong {
+  color: var(--text);
+  font-size: 9px;
+}
+
+.score-pill--oc {
+  color: #ffd479;
+  border-color: rgba(255, 191, 71, 0.24);
+}
+
+.score-pill--oc strong {
+  color: #ffd479;
+}
+
+.score-pill--moby {
+  color: #c7dcff;
+  border-color: rgba(76, 141, 255, 0.2);
+}
+
+.score-pill--moby strong {
+  color: #d7e8ff;
+}
+
+.score-pill--hltb {
+  color: #a8e6c1;
+  border-color: rgba(63, 208, 126, 0.2);
+}
+
+.score-pill--year {
+  color: var(--muted-2);
+}
+
+.game-card__scores + .game-card__ubisoft,
+.game-card__scores + .achievements,
+.game-card__scores + .game-card__empty {
+  margin-top: 7px;
+}

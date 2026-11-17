@@ -44,13 +44,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Epic Games integration with an OAuth authorization-code connection, owned
   games, catalog covers, partial achievements, library badges, and a 120-minute
   sync.
+- Metadata enrichment with MobyGames scores and covers, OpenCritic critic scores,
+  and HowLongToBeat completion times, configurable from the settings page with
+  a manual sync.
 
 ### Changed
 
 - Settings integrations now cover Steam, IGDB, Homepage, InfluxDB, Xbox,
-  Ubisoft, GOG, and Epic Games.
-- The SQLite schema now migrates new Xbox, Ubisoft, GOG, and Epic Games columns
-  on existing game tables.
+  Ubisoft, GOG, Epic Games, and optional metadata providers.
+- The SQLite schema now migrates new platform and metadata columns on existing
+  game tables.
 - Dashboard, library, sessions, stats, agents, user, and settings endpoints now
   require an authenticated session.
 - Admin sync/enrichment endpoints now require an administrator session instead

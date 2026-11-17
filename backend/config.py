@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     ubisoft_sync_minutes: int = 60
     gog_sync_minutes: int = 60
     epic_sync_minutes: int = 120
+    metadata_sync_minutes: int = 360
+    metadata_enrich_limit: int = 8
+    opencritic_enrich_limit: int = 4
     igdb_enrich_limit: int = 8
     steam_achievement_limit: int = 8
     session_days: int = 7

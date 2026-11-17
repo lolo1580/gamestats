@@ -43,6 +43,10 @@ SETTING_EPIC_REFRESH_TOKEN = "epic_refresh_token"
 SETTING_EPIC_ACCOUNT_ID = "epic_account_id"
 SETTING_EPIC_DISPLAY_NAME = "epic_display_name"
 SETTING_EPIC_LAST_SYNC = "epic_last_sync_at"
+SETTING_MOBYGAMES_API_KEY = "mobygames_api_key"
+SETTING_OPENCRITIC_API_KEY = "opencritic_api_key"
+SETTING_HLTB_ENABLED = "hltb_enabled"
+SETTING_METADATA_LAST_SYNC = "metadata_last_sync_at"
 
 SECRET_SETTINGS = {
     SETTING_AGENT_API_KEY,
@@ -55,6 +59,8 @@ SECRET_SETTINGS = {
     SETTING_UBISOFT_REMEMBER_ME_TICKET,
     SETTING_GOG_REFRESH_TOKEN,
     SETTING_EPIC_REFRESH_TOKEN,
+    SETTING_MOBYGAMES_API_KEY,
+    SETTING_OPENCRITIC_API_KEY,
 }
 
 SETTING_DEFAULTS = {
@@ -93,6 +99,10 @@ SETTING_DEFAULTS = {
     SETTING_EPIC_ACCOUNT_ID: lambda: "",
     SETTING_EPIC_DISPLAY_NAME: lambda: "",
     SETTING_EPIC_LAST_SYNC: lambda: "",
+    SETTING_MOBYGAMES_API_KEY: lambda: "",
+    SETTING_OPENCRITIC_API_KEY: lambda: "",
+    SETTING_HLTB_ENABLED: lambda: "true",
+    SETTING_METADATA_LAST_SYNC: lambda: "",
 }
 
 
@@ -125,6 +135,9 @@ class IntegrationSettings:
     epic_refresh_token: str
     epic_account_id: str
     epic_display_name: str
+    mobygames_api_key: str
+    opencritic_api_key: str
+    hltb_enabled: bool
 
     @property
     def steam_configured(self) -> bool:
@@ -162,6 +175,14 @@ class IntegrationSettings:
     @property
     def epic_connected(self) -> bool:
         return bool(self.epic_refresh_token and self.epic_account_id)
+
+    @property
+    def mobygames_configured(self) -> bool:
+        return bool(self.mobygames_api_key)
+
+    @property
+    def opencritic_configured(self) -> bool:
+        return bool(self.opencritic_api_key)
 
 
 def ensure_default_settings(db: Session) -> None:
@@ -227,6 +248,10 @@ def get_integration_settings(db: Session) -> IntegrationSettings:
         epic_refresh_token=get_setting(db, SETTING_EPIC_REFRESH_TOKEN, ""),
         epic_account_id=get_setting(db, SETTING_EPIC_ACCOUNT_ID, ""),
         epic_display_name=get_setting(db, SETTING_EPIC_DISPLAY_NAME, ""),
+        mobygames_api_key=get_setting(db, SETTING_MOBYGAMES_API_KEY, ""),
+        opencritic_api_key=get_setting(db, SETTING_OPENCRITIC_API_KEY, ""),
+        hltb_enabled=get_setting(db, SETTING_HLTB_ENABLED, "true").lower()
+        == "true",
     )
 
 

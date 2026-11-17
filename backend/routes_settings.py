@@ -19,6 +19,7 @@ from settings_service import (
     SETTING_EPIC_DISPLAY_NAME,
     SETTING_EPIC_LAST_SYNC,
     SETTING_EPIC_REFRESH_TOKEN,
+    SETTING_HLTB_ENABLED,
     SETTING_IGDB_CLIENT_ID,
     SETTING_IGDB_CLIENT_SECRET,
     SETTING_INFLUX_BUCKET,
@@ -27,6 +28,9 @@ from settings_service import (
     SETTING_INFLUX_ORG,
     SETTING_INFLUX_TOKEN,
     SETTING_INFLUX_URL,
+    SETTING_METADATA_LAST_SYNC,
+    SETTING_MOBYGAMES_API_KEY,
+    SETTING_OPENCRITIC_API_KEY,
     SETTING_STEAM_API_KEY,
     SETTING_STEAM_ID,
     SETTING_TIMEZONE,
@@ -99,6 +103,14 @@ def _settings_out(db: Session) -> SettingsOut:
         epic_display_name=integration.epic_display_name,
         epic_connected=integration.epic_connected,
         epic_last_sync_at=get_setting(db, SETTING_EPIC_LAST_SYNC) or None,
+        mobygames_api_key_hint=mask_secret(integration.mobygames_api_key),
+        mobygames_api_key_set=bool(integration.mobygames_api_key),
+        mobygames_configured=integration.mobygames_configured,
+        opencritic_api_key_hint=mask_secret(integration.opencritic_api_key),
+        opencritic_api_key_set=bool(integration.opencritic_api_key),
+        opencritic_configured=integration.opencritic_configured,
+        hltb_enabled=integration.hltb_enabled,
+        metadata_last_sync_at=get_setting(db, SETTING_METADATA_LAST_SYNC) or None,
     )
 
 
@@ -187,6 +199,18 @@ def write_settings(
             updates[SETTING_XBOX_XUID] = ""
             updates[SETTING_XBOX_GAMERTAG] = ""
             updates[SETTING_XBOX_GAMERSCORE] = "0"
+    if "mobygames_api_key" in fields:
+        updates[SETTING_MOBYGAMES_API_KEY] = (
+            payload.mobygames_api_key or ""
+        ).strip()
+    if "opencritic_api_key" in fields:
+        updates[SETTING_OPENCRITIC_API_KEY] = (
+            payload.opencritic_api_key or ""
+        ).strip()
+    if "hltb_enabled" in fields:
+        updates[SETTING_HLTB_ENABLED] = (
+            "true" if payload.hltb_enabled else "false"
+        )
 
     current = get_integration_settings(db)
     prospective_url = updates.get(SETTING_INFLUX_URL, current.influxdb_url)

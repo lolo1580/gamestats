@@ -10,7 +10,8 @@ The interface ships in **French and English**, with **dark and light themes**.
 Supported sources: **PC agent**, **Steam**, **Xbox** (achievements, gamerscore,
 and recent games), **Ubisoft Connect** (games, dates, and session counts), **GOG**
 (library and achievements), **Epic Games** (library and partial achievements),
-and **IGDB** metadata.
+and **IGDB** metadata. Optional enrichment adds **MobyGames** scores, **OpenCritic**
+critic scores, and **HowLongToBeat** completion times.
 
 ## Features
 
@@ -38,6 +39,9 @@ and **IGDB** metadata.
 - **Double-count protection** — Steam playtime deltas already covered by an
   agent session are ignored.
 - **IGDB enrichment** — HD covers and genres for games that do not have them yet.
+- **Metadata enrichment** — MobyGames scores and fallback covers, OpenCritic
+  critic scores and tiers, and HowLongToBeat community completion times. These
+  providers are optional and run in the background.
 - **Session history** — filter by source (PC agent or Steam), search by game,
   and group sessions by day.
 - **Library** — search, sort, inspect playtime and achievement progress.
@@ -83,8 +87,8 @@ frontend (React/nginx) ◄──────── GET /api/* ──────
 - **Scheduler** closes stale sessions every minute, syncs Steam every 15 minutes,
   enriches IGDB data every 60 minutes, exports InfluxDB points every 15 minutes,
   syncs Xbox every 30 minutes, syncs Ubisoft every 60 minutes, syncs GOG every
-  60 minutes, and syncs Epic Games every 120 minutes. Run a single uvicorn worker
-  so the scheduler is not duplicated.
+  60 minutes, syncs Epic Games every 120 minutes, and enriches metadata every
+  360 minutes. Run a single uvicorn worker so the scheduler is not duplicated.
 - **Frontend** is a React/Vite SPA served by nginx. `/api` is proxied to the
   backend.
 
@@ -138,6 +142,9 @@ Copy `.env.example` to `.env` and adjust the values:
 | `UBISOFT_SYNC_MINUTES`  | `60`                 | Ubisoft synchronization interval.                                  |
 | `GOG_SYNC_MINUTES`      | `60`                 | GOG synchronization interval.                                      |
 | `EPIC_SYNC_MINUTES`     | `120`                | Epic Games synchronization interval.                               |
+| `METADATA_SYNC_MINUTES` | `360`                | MobyGames/OpenCritic/HowLongToBeat enrichment interval.            |
+| `METADATA_ENRICH_LIMIT` | `8`                  | Maximum games processed per metadata run.                          |
+| `OPENCRITIC_ENRICH_LIMIT`| `4`                 | Maximum OpenCritic searches per run (free RapidAPI quota).         |
 | `SESSION_DAYS`          | `7`                  | Browser session lifetime, in days.                                |
 | `COOKIE_SECURE`         | `false`              | Set to `true` when serving the app over HTTPS.                     |
 | `SCHEDULER_ENABLED`     | `true`               | Set to `false` to disable background jobs.                         |
@@ -258,6 +265,28 @@ The Epic integration is unofficial and may need updates if Epic changes its API.
 Achievements are available only for supported games. Disconnect the account in
 Settings to revoke the stored token.
 
+## Metadata setup
+
+GameStats can enrich games with data from three optional sources:
+
+- **MobyGames** — score, vote count, release date, and fallback cover. Create a
+  free non-commercial account, open your profile, and request an API key. The
+  free tier is limited to about one request per second.
+- **OpenCritic** — top-critic score, tier, review count, and recommendation
+  percentage. Subscribe to the free OpenCritic API plan on RapidAPI and paste the
+  RapidAPI key. Free quotas are limited, so GameStats processes only a few
+  OpenCritic games per run.
+- **HowLongToBeat** — community main-story, main-plus-extra, and completionist
+  durations. No key is required; this uses the public website's search endpoint
+  and is not an official API.
+
+Enter the keys in **Settings → Intégrations → Métadonnées** and click
+**Synchroniser les métadonnées**. The scheduler also runs the enrichment every
+six hours.
+
+**Giant Bomb is not integrated**: its official API no longer exposes game data
+since 2026, so there is no reliable endpoint to query.
+
 ## Windows agent
 
 Requirements: Python 3.10+ on Windows, on the same network as the backend.
@@ -368,6 +397,7 @@ not be visible. Check the log file if nothing appears in the dashboard.
 | `POST` | `/api/epic/connect`      | Connect with an Epic authorization code (admin)  |
 | `POST` | `/api/epic/sync`         | Force an Epic Games synchronization (admin)      |
 | `POST` | `/api/epic/disconnect`   | Disconnect the Epic Games account (admin)        |
+| `POST` | `/api/metadata/sync`     | Enrich MobyGames/OpenCritic/HowLongToBeat (admin) |
 | `POST` | `/api/admin/sync/steam`   | Force a Steam sync (admin session)               |
 | `POST` | `/api/admin/enrich/igdb`  | Force IGDB enrichment (admin session)            |
 
@@ -455,6 +485,8 @@ gamestats/
 │   ├── collectors/gog.py    # GOG Galaxy API client and parser
 │   ├── routes_epic.py       # Epic Games OAuth connection and sync
 │   ├── collectors/epic.py   # Epic Games API client and parser
+│   ├── routes_metadata.py   # Metadata enrichment endpoint
+│   ├── collectors/metadata.py # MobyGames, OpenCritic, HowLongToBeat clients
 │   ├── heartbeat.py         # Agent session lifecycle
 │   ├── stats.py             # Summary, daily, heatmap, top games
 │   ├── scheduler.py         # Background jobs
@@ -543,6 +575,8 @@ npm run build
   revoked by disconnecting the account.
 - The Epic Games refresh token is stored in SQLite, masked in API responses, and
   can be revoked by disconnecting the account.
+- MobyGames and OpenCritic API keys are stored in SQLite and masked in API
+  responses.
 - The default `AGENT_API_KEY` is `change-me`; change it before exposing the
   service on a network.
 - `.env`, the SQLite database, and local build artifacts are excluded from Git.
@@ -563,6 +597,11 @@ npm run build
   only; playtime remains measured by the PC agent.
 - Epic Games support relies on an unofficial launcher API. Achievements are
   partial, and playtime remains measured by the PC agent.
+- OpenCritic uses the RapidAPI free tier by default, which limits how many games
+  can be enriched per day.
+- HowLongToBeat has no official public API; the enrichment uses its website
+  search endpoint and may break if the site changes.
+- Giant Bomb is not integrated because its games API is unavailable.
 - Restoring a backup replaces users, games, sessions, settings, and invalidates
   current login sessions.
 - InfluxDB exports are incremental and idempotent by point timestamp; changing

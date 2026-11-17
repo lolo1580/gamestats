@@ -46,6 +46,22 @@ def game_payload(game: Game) -> dict:
         "epic_catalog_item_id": game.epic_catalog_item_id,
         "epic_achievements_total": game.epic_achievements_total or 0,
         "epic_achievements_unlocked": game.epic_achievements_unlocked or 0,
+        "release_date": game.release_date,
+        "mobygames_id": game.mobygames_id,
+        "mobygames_url": game.mobygames_url,
+        "mobygames_score": game.mobygames_score,
+        "mobygames_num_votes": game.mobygames_num_votes or 0,
+        "opencritic_id": game.opencritic_id,
+        "opencritic_url": game.opencritic_url,
+        "opencritic_score": game.opencritic_score,
+        "opencritic_tier": game.opencritic_tier,
+        "opencritic_reviews": game.opencritic_reviews or 0,
+        "opencritic_recommended": game.opencritic_recommended,
+        "hltb_id": game.hltb_id,
+        "hltb_url": game.hltb_url,
+        "hltb_main_minutes": game.hltb_main_minutes or 0,
+        "hltb_main_extra_minutes": game.hltb_main_extra_minutes or 0,
+        "hltb_completionist_minutes": game.hltb_completionist_minutes or 0,
     }
 
 

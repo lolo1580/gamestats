@@ -103,6 +103,14 @@ class SettingsOut(BaseModel):
     epic_display_name: str
     epic_connected: bool
     epic_last_sync_at: str | None
+    mobygames_api_key_hint: str
+    mobygames_api_key_set: bool
+    mobygames_configured: bool
+    opencritic_api_key_hint: str
+    opencritic_api_key_set: bool
+    opencritic_configured: bool
+    hltb_enabled: bool
+    metadata_last_sync_at: str | None
 
 
 class SettingsUpdate(BaseModel):
@@ -120,6 +128,9 @@ class SettingsUpdate(BaseModel):
     influxdb_enabled: bool | None = None
     xbox_client_id: str | None = None
     xbox_refresh_token: str | None = None
+    mobygames_api_key: str | None = None
+    opencritic_api_key: str | None = None
+    hltb_enabled: bool | None = None
 
 
 class AgentKeyOut(BaseModel):
@@ -207,6 +218,17 @@ class EpicOut(BaseModel):
     message: str | None = None
 
 
+class MetadataSyncOut(BaseModel):
+    skipped: bool = False
+    reason: str | None = None
+    message: str | None = None
+    games_processed: int = 0
+    mobygames_matched: int = 0
+    opencritic_matched: int = 0
+    hltb_matched: int = 0
+    last_sync_at: str | None = None
+
+
 class HeartbeatGameIn(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     process: str | None = Field(default=None, max_length=255)
@@ -260,6 +282,22 @@ class GameOut(BaseModel):
     epic_catalog_item_id: str | None
     epic_achievements_total: int
     epic_achievements_unlocked: int
+    release_date: str | None
+    mobygames_id: int | None
+    mobygames_url: str | None
+    mobygames_score: float | None
+    mobygames_num_votes: int
+    opencritic_id: int | None
+    opencritic_url: str | None
+    opencritic_score: float | None
+    opencritic_tier: str | None
+    opencritic_reviews: int
+    opencritic_recommended: int | None
+    hltb_id: int | None
+    hltb_url: str | None
+    hltb_main_minutes: int
+    hltb_main_extra_minutes: int
+    hltb_completionist_minutes: int
 
 
 class TopGameOut(GameOut):

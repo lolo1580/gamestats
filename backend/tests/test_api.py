@@ -6,6 +6,8 @@ import httpx
 import influx as influx_module
 from collectors import epic as epic_module
 from collectors import gog as gog_module
+from collectors import metadata as metadata_module
+from collectors.metadata import best_candidate, normalize_title
 from collectors import ubisoft as ubisoft_module
 from collectors import xbox as xbox_module
 from collectors.ubisoft import parse_games_played
@@ -17,6 +19,9 @@ from settings_service import (
     SETTING_EPIC_REFRESH_TOKEN,
     SETTING_GOG_REFRESH_TOKEN,
     SETTING_GOG_USER_ID,
+    SETTING_HLTB_ENABLED,
+    SETTING_MOBYGAMES_API_KEY,
+    SETTING_OPENCRITIC_API_KEY,
     SETTING_UBISOFT_REMEMBER_ME_TICKET,
     SETTING_XBOX_CLIENT_ID,
     SETTING_XBOX_REFRESH_TOKEN,
@@ -864,3 +869,139 @@ def test_epic_sync_maps_library(client, monkeypatch):
     assert settings["epic_connected"] is True
     assert settings["epic_display_name"] == "Epic Player"
     assert settings["epic_last_sync_at"] is not None
+def test_metadata_title_matching():
+    assert normalize_title(
+        "The Witcher 3: Wild Hunt - Game of the Year Edition"
+    ) == "the witcher 3 wild hunt"
+
+    match = best_candidate(
+        "The Witcher 3: Wild Hunt",
+        [
+            {"title": "The Witcher 2: Assassins of Kings"},
+            {"title": "The Witcher 3: Wild Hunt"},
+            {"title": "The Witcher 3: Wild Hunt - Blood and Wine"},
+        ],
+        "title",
+    )
+    assert match is not None
+    assert match["title"] == "The Witcher 3: Wild Hunt"
+
+
+def test_metadata_sync_without_providers(client):
+    with SessionLocal() as db:
+        update_settings(db, {SETTING_HLTB_ENABLED: "false"})
+
+    response = client.post("/api/metadata/sync")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["skipped"] is True
+    assert body["reason"]
+
+
+def test_metadata_sync_maps_providers(client, monkeypatch):
+    with SessionLocal() as db:
+        update_settings(
+            db,
+            {
+                SETTING_MOBYGAMES_API_KEY: "moby-key",
+                SETTING_OPENCRITIC_API_KEY: "oc-key",
+                SETTING_HLTB_ENABLED: "true",
+            },
+        )
+        db.add(
+            Game(
+                name="The Witcher 3: Wild Hunt",
+                name_key="the witcher 3 wild hunt",
+            )
+        )
+        db.commit()
+
+    class FakeMobyGamesClient:
+        def __init__(self, api_key):
+            assert api_key == "moby-key"
+
+        def enrich(self, title):
+            assert title == "The Witcher 3: Wild Hunt"
+            return {
+                "id": 123,
+                "url": "https://www.mobygames.com/game/123",
+                "score": 4.3,
+                "num_votes": 512,
+                "release_date": "2015-05-19",
+                "cover_url": "https://cdn.mobygames.com/witcher3.jpg",
+            }
+
+        def close(self):
+            pass
+
+    class FakeOpenCriticClient:
+        def __init__(self, api_key):
+            assert api_key == "oc-key"
+
+        def enrich(self, title):
+            return {
+                "id": 42,
+                "url": "https://opencritic.com/game/42",
+                "score": 92.5,
+                "tier": "Mighty",
+                "reviews": 180,
+                "recommended": 95,
+                "release_date": "2015-05-18",
+                "cover_url": "https://cdn.opencritic.com/witcher3.jpg",
+            }
+
+        def close(self):
+            pass
+
+    class FakeHowLongToBeatClient:
+        def enrich(self, title):
+            return {
+                "id": 10270,
+                "url": "https://howlongtobeat.com/game/10270",
+                "main_minutes": 3100,
+                "main_extra_minutes": 6227,
+                "completionist_minutes": 10522,
+            }
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(metadata_module, "MobyGamesClient", FakeMobyGamesClient)
+    monkeypatch.setattr(
+        metadata_module, "OpenCriticClient", FakeOpenCriticClient
+    )
+    monkeypatch.setattr(
+        metadata_module, "HowLongToBeatClient", FakeHowLongToBeatClient
+    )
+
+    response = client.post("/api/metadata/sync")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["skipped"] is False
+    assert body["games_processed"] == 1
+    assert body["mobygames_matched"] == 1
+    assert body["opencritic_matched"] == 1
+    assert body["hltb_matched"] == 1
+
+    games = client.get("/api/games").json()
+    game = games[0]
+    assert game["mobygames_id"] == 123
+    assert game["mobygames_score"] == 4.3
+    assert game["mobygames_num_votes"] == 512
+    assert game["opencritic_id"] == 42
+    assert game["opencritic_score"] == 92.5
+    assert game["opencritic_tier"] == "Mighty"
+    assert game["opencritic_reviews"] == 180
+    assert game["opencritic_recommended"] == 95
+    assert game["hltb_id"] == 10270
+    assert game["hltb_main_minutes"] == 3100
+    assert game["hltb_main_extra_minutes"] == 6227
+    assert game["hltb_completionist_minutes"] == 10522
+    assert game["release_date"] == "2015-05-19"
+    assert game["cover_url"] == "https://cdn.mobygames.com/witcher3.jpg"
+
+    settings = client.get("/api/settings").json()
+    assert settings["mobygames_configured"] is True
+    assert settings["opencritic_configured"] is True
+    assert settings["hltb_enabled"] is True
+    assert settings["metadata_last_sync_at"] is not None

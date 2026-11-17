@@ -89,6 +89,25 @@ def _ensure_sqlite_columns() -> None:
         "epic_achievements_total": "INTEGER NOT NULL DEFAULT 0",
         "epic_achievements_unlocked": "INTEGER NOT NULL DEFAULT 0",
         "epic_achievements_checked_at": "DATETIME",
+        "release_date": "VARCHAR(10)",
+        "mobygames_id": "INTEGER",
+        "mobygames_url": "TEXT",
+        "mobygames_score": "FLOAT",
+        "mobygames_num_votes": "INTEGER NOT NULL DEFAULT 0",
+        "mobygames_checked_at": "DATETIME",
+        "opencritic_id": "INTEGER",
+        "opencritic_url": "TEXT",
+        "opencritic_score": "FLOAT",
+        "opencritic_tier": "VARCHAR(16)",
+        "opencritic_reviews": "INTEGER NOT NULL DEFAULT 0",
+        "opencritic_recommended": "INTEGER",
+        "opencritic_checked_at": "DATETIME",
+        "hltb_id": "INTEGER",
+        "hltb_url": "TEXT",
+        "hltb_main_minutes": "INTEGER NOT NULL DEFAULT 0",
+        "hltb_main_extra_minutes": "INTEGER NOT NULL DEFAULT 0",
+        "hltb_completionist_minutes": "INTEGER NOT NULL DEFAULT 0",
+        "hltb_checked_at": "DATETIME",
     }
     with engine.begin() as connection:
         for name, ddl in additions.items():
@@ -110,6 +129,11 @@ def _ensure_sqlite_columns() -> None:
             'CREATE UNIQUE INDEX IF NOT EXISTS "ix_games_epic_catalog_item_id" '
             'ON "games" ("epic_catalog_item_id")'
         )
+        for name in ("mobygames_id", "opencritic_id", "hltb_id"):
+            connection.exec_driver_sql(
+                f'CREATE INDEX IF NOT EXISTS "ix_games_{name}" '
+                f'ON "games" ("{name}")'
+            )
 
 
 def get_db():

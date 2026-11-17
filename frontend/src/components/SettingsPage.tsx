@@ -95,6 +95,10 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
   const [epicCode, setEpicCode] = useState('')
   const [epicBusy, setEpicBusy] = useState(false)
   const [epicAuthUrl, setEpicAuthUrl] = useState<string | null>(null)
+  const [mobygamesKey, setMobygamesKey] = useState('')
+  const [opencriticKey, setOpencriticKey] = useState('')
+  const [hltbEnabled, setHltbEnabled] = useState(true)
+  const [metadataBusy, setMetadataBusy] = useState(false)
 
   const [newUsername, setNewUsername] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -136,6 +140,7 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       setInfluxBucket(nextSettings.influxdb_bucket)
       setInfluxEnabled(nextSettings.influxdb_enabled)
       setXboxClientId(nextSettings.xbox_client_id)
+      setHltbEnabled(nextSettings.hltb_enabled)
     } catch (loadError) {
       reportError(loadError)
     } finally {
@@ -183,21 +188,27 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
         influxdb_bucket: influxBucket.trim(),
         influxdb_enabled: influxEnabled,
         xbox_client_id: xboxClientId.trim(),
+        hltb_enabled: hltbEnabled,
       }
       if (steamKey.trim()) payload.steam_api_key = steamKey.trim()
       if (igdbSecret.trim()) payload.igdb_client_secret = igdbSecret.trim()
       if (influxToken.trim()) payload.influxdb_token = influxToken.trim()
+      if (mobygamesKey.trim()) payload.mobygames_api_key = mobygamesKey.trim()
+      if (opencriticKey.trim()) payload.opencritic_api_key = opencriticKey.trim()
 
       const next = await api.updateSettings(payload)
       setSettings(next)
       setSteamKey('')
       setIgdbSecret('')
       setInfluxToken('')
+      setMobygamesKey('')
+      setOpencriticKey('')
       setInfluxUrl(next.influxdb_url)
       setInfluxOrg(next.influxdb_org)
       setInfluxBucket(next.influxdb_bucket)
       setInfluxEnabled(next.influxdb_enabled)
       setXboxClientId(next.xbox_client_id)
+      setHltbEnabled(next.hltb_enabled)
       flash(t('settings.integrations.saved'))
     } catch (saveError) {
       reportError(saveError)
@@ -551,6 +562,47 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       reportError(epicError)
     } finally {
       setEpicBusy(false)
+    }
+  }
+
+  const clearMetadataKey = async (
+    field: 'mobygames_api_key' | 'opencritic_api_key',
+  ) => {
+    if (!window.confirm(t('settings.integrations.confirmDelete'))) return
+    setSaving(true)
+    setError(null)
+    try {
+      const next = await api.updateSettings({ [field]: '' })
+      setSettings(next)
+      flash(t('settings.integrations.secretDeleted'))
+    } catch (metadataError) {
+      reportError(metadataError)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const syncMetadataNow = async () => {
+    setMetadataBusy(true)
+    setError(null)
+    try {
+      const result = await api.syncMetadata()
+      setSettings(await api.settings())
+      if (result.skipped) {
+        flash(result.reason ?? t('settings.integrations.metadataSkipped'))
+      } else {
+        const summary = t('settings.integrations.metadataSynced', {
+          games: result.games_processed,
+          moby: result.mobygames_matched,
+          critic: result.opencritic_matched,
+          hltb: result.hltb_matched,
+        })
+        flash(result.message ? `${summary} ${result.message}` : summary)
+      }
+    } catch (metadataError) {
+      reportError(metadataError)
+    } finally {
+      setMetadataBusy(false)
     }
   }
 
@@ -1519,6 +1571,148 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               </p>
             </div>
 
+            <div className="settings-group">
+              <div className="settings-group__head">
+                <h3>{t('settings.integrations.metadata')}</h3>
+              </div>
+              <p className="settings-hint">
+                {t('settings.integrations.metadataSubtitle')}
+              </p>
+              <p className="settings-hint">
+                {t('settings.integrations.metadataStatus', {
+                  moby: settings.mobygames_configured
+                    ? t('common.configured')
+                    : t('common.notConfigured'),
+                  critic: settings.opencritic_configured
+                    ? t('common.configured')
+                    : t('common.notConfigured'),
+                  hltb: settings.hltb_enabled
+                    ? t('common.active')
+                    : t('common.disabled'),
+                })}
+              </p>
+
+              <label className="field">
+                <span>{t('settings.integrations.mobygamesKey')}</span>
+                <input
+                  className="input"
+                  type="password"
+                  value={mobygamesKey}
+                  onChange={(event) => setMobygamesKey(event.target.value)}
+                  placeholder={
+                    settings.mobygames_api_key_set
+                      ? settings.mobygames_api_key_hint
+                      : t('settings.integrations.mobygamesKey')
+                  }
+                  autoComplete="off"
+                />
+                <small>
+                  {t('settings.integrations.mobygamesHint')}{' '}
+                  <a
+                    href="https://www.mobygames.com/info/api/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t('settings.integrations.mobygamesOpen')}
+                  </a>
+                </small>
+              </label>
+              {settings.mobygames_api_key_set && (
+                <div className="settings-actions">
+                  <button
+                    type="button"
+                    className="button button--danger"
+                    onClick={() => clearMetadataKey('mobygames_api_key')}
+                    disabled={saving}
+                  >
+                    <Trash2 size={14} strokeWidth={2} />
+                    {t('settings.integrations.deleteKey')}
+                  </button>
+                </div>
+              )}
+
+              <label className="field">
+                <span>{t('settings.integrations.opencriticKey')}</span>
+                <input
+                  className="input"
+                  type="password"
+                  value={opencriticKey}
+                  onChange={(event) => setOpencriticKey(event.target.value)}
+                  placeholder={
+                    settings.opencritic_api_key_set
+                      ? settings.opencritic_api_key_hint
+                      : t('settings.integrations.opencriticKey')
+                  }
+                  autoComplete="off"
+                />
+                <small>
+                  {t('settings.integrations.opencriticHint')}{' '}
+                  <a
+                    href="https://rapidapi.com/opencritic-opencritic-default/api/opencritic-api"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t('settings.integrations.opencriticOpen')}
+                  </a>
+                </small>
+              </label>
+              {settings.opencritic_api_key_set && (
+                <div className="settings-actions">
+                  <button
+                    type="button"
+                    className="button button--danger"
+                    onClick={() => clearMetadataKey('opencritic_api_key')}
+                    disabled={saving}
+                  >
+                    <Trash2 size={14} strokeWidth={2} />
+                    {t('settings.integrations.deleteKey')}
+                  </button>
+                </div>
+              )}
+
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={hltbEnabled}
+                  onChange={(event) => setHltbEnabled(event.target.checked)}
+                />
+                <span>{t('settings.integrations.hltbEnabled')}</span>
+              </label>
+              <p className="settings-hint">
+                {t('settings.integrations.hltbHint')}
+              </p>
+
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={syncMetadataNow}
+                  disabled={
+                    metadataBusy ||
+                    (!settings.mobygames_configured &&
+                      !settings.opencritic_configured &&
+                      !settings.hltb_enabled)
+                  }
+                >
+                  <RefreshCw
+                    size={14}
+                    strokeWidth={2}
+                    className={metadataBusy ? 'is-spinning' : undefined}
+                  />
+                  {t('settings.integrations.metadataSync')}
+                </button>
+                <span className="settings-hint inline-hint">
+                  {t('settings.integrations.metadataLastSync')} :{' '}
+                  {settings.metadata_last_sync_at
+                    ? formatRelative(settings.metadata_last_sync_at, lang)
+                    : t('common.never')}
+                </span>
+              </div>
+              <p className="settings-hint">
+                {t('settings.integrations.metadataGiantBomb')}
+              </p>
+            </div>
+
             <button type="submit" className="button button--primary" disabled={saving}>
               <Save size={15} strokeWidth={2} />
               {t('settings.integrations.save')}
@@ -2018,6 +2212,21 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               <code>library-service .../items · launcher.store.epicgames.com/graphql</code>
             </div>
             <p className="settings-hint">{t('settings.docs.epicHint')}</p>
+          </section>
+
+          <section className="panel settings-panel">
+            <header className="card-head">
+              <div>
+                <h2>{t('settings.docs.metadataTitle')}</h2>
+                <p>{t('settings.docs.metadataSubtitle')}</p>
+              </div>
+            </header>
+            <div className="docs-code">
+              <code>MobyGames → api.mobygames.com/v1/games</code>
+              <code>OpenCritic → opencritic-api.p.rapidapi.com/game/search</code>
+              <code>HowLongToBeat → howlongtobeat.com/api/search/site</code>
+            </div>
+            <p className="settings-hint">{t('settings.docs.metadataHint')}</p>
           </section>
         </div>
       )}

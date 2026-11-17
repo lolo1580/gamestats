@@ -65,6 +65,14 @@ export interface AppSettings {
   epic_display_name: string
   epic_connected: boolean
   epic_last_sync_at: string | null
+  mobygames_api_key_hint: string
+  mobygames_api_key_set: boolean
+  mobygames_configured: boolean
+  opencritic_api_key_hint: string
+  opencritic_api_key_set: boolean
+  opencritic_configured: boolean
+  hltb_enabled: boolean
+  metadata_last_sync_at: string | null
 }
 
 export interface SettingsUpdatePayload {
@@ -82,6 +90,9 @@ export interface SettingsUpdatePayload {
   influxdb_enabled?: boolean
   xbox_client_id?: string
   xbox_refresh_token?: string
+  mobygames_api_key?: string
+  opencritic_api_key?: string
+  hltb_enabled?: boolean
 }
 
 export interface XboxDeviceCode {
@@ -141,6 +152,17 @@ export interface EpicResult {
   message: string | null
 }
 
+export interface MetadataSyncResult {
+  skipped: boolean
+  reason: string | null
+  message: string | null
+  games_processed: number
+  mobygames_matched: number
+  opencritic_matched: number
+  hltb_matched: number
+  last_sync_at: string | null
+}
+
 export interface InfluxExportResult {
   skipped: boolean
   reason: string | null
@@ -176,6 +198,22 @@ export interface Game {
   epic_catalog_item_id: string | null
   epic_achievements_total: number
   epic_achievements_unlocked: number
+  release_date: string | null
+  mobygames_id: number | null
+  mobygames_url: string | null
+  mobygames_score: number | null
+  mobygames_num_votes: number
+  opencritic_id: number | null
+  opencritic_url: string | null
+  opencritic_score: number | null
+  opencritic_tier: string | null
+  opencritic_reviews: number
+  opencritic_recommended: number | null
+  hltb_id: number | null
+  hltb_url: string | null
+  hltb_main_minutes: number
+  hltb_main_extra_minutes: number
+  hltb_completionist_minutes: number
 }
 
 export interface TopGame extends Game {
