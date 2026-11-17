@@ -129,7 +129,7 @@ the GitHub Container Registry on every push to `main` (and on manual dispatch):
 - `ghcr.io/lolo1580/gamestats-backend:preview-YYYY-MM-DD-1`
 - `ghcr.io/lolo1580/gamestats-frontend:preview-YYYY-MM-DD-1`
 
-The dated tag uses the UTC build date, for example
+The dated tag uses the build date in the Europe/Paris timezone, for example
 `preview-2026-11-17-1`. The packages are private by default: make them public in
 the GitHub package settings, or authenticate before pulling:
 

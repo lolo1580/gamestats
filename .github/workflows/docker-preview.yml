@@ -26,7 +26,7 @@ jobs:
         id: vars
         run: |
           owner="$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
-          date_tag="preview-$(date -u +%Y-%m-%d)-1"
+          date_tag="preview-$(TZ=Europe/Paris date +%Y-%m-%d)-1"
           echo "owner=$owner" >> "$GITHUB_OUTPUT"
           echo "date_tag=$date_tag" >> "$GITHUB_OUTPUT"
           echo "backend=ghcr.io/$owner/gamestats-backend" >> "$GITHUB_OUTPUT"
