@@ -1,0 +1,8 @@
+services:
+  backend:
+    image: ghcr.io/lolo1580/gamestats-backend:${GAMESTATS_IMAGE_TAG:-preview-latest}
+    build: !reset null
+
+  frontend:
+    image: ghcr.io/lolo1580/gamestats-frontend:${GAMESTATS_IMAGE_TAG:-preview-latest}
+    build: !reset null

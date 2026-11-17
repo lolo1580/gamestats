@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   connection test, and a GitHub Actions build workflow.
 - JSON settings support for the Windows agent, with per-user configuration,
   games list, and log files under `%APPDATA%\GameStats`.
+- GitHub Actions workflow that publishes backend and frontend preview images to
+  GHCR with `preview-latest` and `preview-YYYY-MM-DD-1` tags, plus a
+  `compose.preview.yml` override for running the published images.
 
 ### Changed
 

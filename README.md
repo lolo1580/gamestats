@@ -119,6 +119,39 @@ SQLite data is stored in `./data/gamestats.db` on the host.
 On first launch, open the dashboard and create the administrator account. There
 is no default password. The Swagger and ReDoc pages require this session too.
 
+## Preview Docker images
+
+The `Publish preview Docker images` workflow builds and pushes both images to
+the GitHub Container Registry on every push to `main` (and on manual dispatch):
+
+- `ghcr.io/lolo1580/gamestats-backend:preview-latest`
+- `ghcr.io/lolo1580/gamestats-frontend:preview-latest`
+- `ghcr.io/lolo1580/gamestats-backend:preview-YYYY-MM-DD-1`
+- `ghcr.io/lolo1580/gamestats-frontend:preview-YYYY-MM-DD-1`
+
+The dated tag uses the UTC build date, for example
+`preview-2026-11-17-1`. The packages are private by default: make them public in
+the GitHub package settings, or authenticate before pulling:
+
+```bash
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
+```
+
+To run the published images instead of building locally, use the preview
+override (Docker Compose 2.24+ for `build: !reset`):
+
+```bash
+docker compose -f compose.yml -f compose.preview.yml pull
+docker compose -f compose.yml -f compose.preview.yml up -d
+```
+
+Set `GAMESTATS_IMAGE_TAG` to use a dated tag:
+
+```bash
+GAMESTATS_IMAGE_TAG=preview-2026-11-17-1 \
+  docker compose -f compose.yml -f compose.preview.yml up -d
+```
+
 ## Configuration
 
 Copy `.env.example` to `.env` and adjust the values:
