@@ -40,6 +40,9 @@ def game_payload(game: Game) -> dict:
         "ubisoft_sessions_count": game.ubisoft_sessions_count or 0,
         "ubisoft_first_played_at": iso_utc(game.ubisoft_first_played_at),
         "ubisoft_last_played_at": iso_utc(game.ubisoft_last_played_at),
+        "gog_product_id": game.gog_product_id,
+        "gog_achievements_total": game.gog_achievements_total or 0,
+        "gog_achievements_unlocked": game.gog_achievements_unlocked or 0,
     }
 
 

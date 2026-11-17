@@ -4,6 +4,7 @@ from datetime import timedelta
 import httpx
 
 import influx as influx_module
+from collectors import gog as gog_module
 from collectors import ubisoft as ubisoft_module
 from collectors import xbox as xbox_module
 from collectors.ubisoft import parse_games_played
@@ -11,6 +12,8 @@ from collectors.xbox import parse_titles
 from database import SessionLocal
 from models import Game, GameSession, utcnow
 from settings_service import (
+    SETTING_GOG_REFRESH_TOKEN,
+    SETTING_GOG_USER_ID,
     SETTING_UBISOFT_REMEMBER_ME_TICKET,
     SETTING_XBOX_CLIENT_ID,
     SETTING_XBOX_REFRESH_TOKEN,
@@ -617,3 +620,111 @@ def test_ubisoft_sync_maps_library(client, monkeypatch):
     settings = client.get("/api/settings").json()
     assert settings["ubisoft_connected"] is True
     assert settings["ubisoft_name"] == "Ubisoft Player"
+def test_gog_extract_code():
+    from routes_gog import _extract_code
+
+    assert _extract_code("abc123def456") == "abc123def456"
+    assert (
+        _extract_code(
+            "https://embed.gog.com/on_login_success?origin=client&code=token-code-1"
+        )
+        == "token-code-1"
+    )
+
+
+def test_gog_auth_url(client):
+    response = client.get("/api/gog/auth-url")
+    assert response.status_code == 200
+    body = response.json()
+    assert "auth.gog.com/auth" in body["url"]
+    assert "client_id=46899977096215655" in body["url"]
+    assert "response_type=code" in body["url"]
+    assert "embed.gog.com" in body["redirect_uri"]
+
+
+def test_gog_endpoints_without_connection(client):
+    sync = client.post("/api/gog/sync")
+    assert sync.status_code == 200
+    assert sync.json()["connected"] is False
+
+    settings = client.get("/api/settings").json()
+    assert settings["gog_connected"] is False
+    assert settings["gog_refresh_token_set"] is False
+
+    disconnect = client.post("/api/gog/disconnect")
+    assert disconnect.status_code == 200
+
+
+def test_gog_sync_maps_library(client, monkeypatch):
+    with SessionLocal() as db:
+        update_settings(
+            db,
+            {
+                SETTING_GOG_REFRESH_TOKEN: "refresh-token",
+                SETTING_GOG_USER_ID: "12345",
+            },
+        )
+
+    class FakeGogClient:
+        def __init__(self, _refresh_token=""):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def refresh(self):
+            return {
+                "access_token": "access-token",
+                "refresh_token": "new-refresh-token",
+                "user_id": "12345",
+            }
+
+        def user_data(self, _access_token):
+            return {"username": "Gog Player", "userId": "12345"}
+
+        def owned_product_ids(self, _access_token):
+            return [1207658691, 999]
+
+        def products(self, _product_ids):
+            return [
+                {
+                    "id": 1207658691,
+                    "title": "The Witcher 3: Wild Hunt",
+                    "game_type": "game",
+                    "images": {"background": "//images.gog.com/witcher3.jpg"},
+                },
+                {
+                    "id": 999,
+                    "title": "Bonus Soundtrack",
+                    "game_type": "dlc",
+                },
+            ]
+
+        def achievements(self, _product_id, _user_id, _access_token):
+            return 52, 17
+
+    monkeypatch.setattr(gog_module, "GogClient", FakeGogClient)
+
+    response = client.post("/api/gog/sync")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["connected"] is True
+    assert body["name"] == "Gog Player"
+    assert body["games_synced"] == 1
+
+    games = client.get("/api/games").json()
+    assert len(games) == 1
+    game = games[0]
+    assert game["name"] == "The Witcher 3: Wild Hunt"
+    assert game["gog_product_id"] == 1207658691
+    assert game["gog_achievements_total"] == 52
+    assert game["gog_achievements_unlocked"] == 17
+    assert game["cover_url"] == "https://images.gog.com/witcher3.jpg"
+
+    settings = client.get("/api/settings").json()
+    assert settings["gog_connected"] is True
+    assert settings["gog_username"] == "Gog Player"
+    assert settings["gog_last_sync_at"] is not None

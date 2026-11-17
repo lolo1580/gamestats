@@ -138,15 +138,22 @@ export function Library({ games, loading }: LibraryProps) {
         <div className="library-grid">
           {visibleGames.map((game) => {
             const hasSteamAchievements = game.achievements_total > 0
+            const hasXboxAchievements = game.xbox_achievements_total > 0
             const achievementsTotal = hasSteamAchievements
               ? game.achievements_total
-              : game.xbox_achievements_total
+              : hasXboxAchievements
+                ? game.xbox_achievements_total
+                : game.gog_achievements_total
             const achievementsUnlocked = hasSteamAchievements
               ? game.achievements_unlocked
-              : game.xbox_achievements_unlocked
+              : hasXboxAchievements
+                ? game.xbox_achievements_unlocked
+                : game.gog_achievements_unlocked
             const achievementsSource = hasSteamAchievements
               ? t('library.achievementsLabel')
-              : t('library.achievementsXbox')
+              : hasXboxAchievements
+                ? t('library.achievementsXbox')
+                : t('library.achievementsGog')
             const progress =
               achievementsTotal > 0
                 ? Math.round((achievementsUnlocked / achievementsTotal) * 100)
@@ -156,8 +163,15 @@ export function Library({ games, loading }: LibraryProps) {
               <article key={game.id} className="game-card">
                 <div className="game-card__media">
                   <Cover src={game.cover_url} name={game.name} className="game-cover" />
-                  {game.xbox_title_id && (
-                    <span className="game-card__platform">{t('library.xboxBadge')}</span>
+                  {(game.xbox_title_id || game.gog_product_id) && (
+                    <span className="game-card__platform">
+                      {[
+                        game.xbox_title_id ? t('library.xboxBadge') : null,
+                        game.gog_product_id ? t('library.gogBadge') : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
                   )}
                   {game.steam_playtime_minutes > 0 && (
                     <span className="game-card__playtime">

@@ -80,6 +80,10 @@ def _ensure_sqlite_columns() -> None:
         "ubisoft_sessions_count": "INTEGER NOT NULL DEFAULT 0",
         "ubisoft_first_played_at": "DATETIME",
         "ubisoft_last_played_at": "DATETIME",
+        "gog_product_id": "INTEGER",
+        "gog_achievements_total": "INTEGER NOT NULL DEFAULT 0",
+        "gog_achievements_unlocked": "INTEGER NOT NULL DEFAULT 0",
+        "gog_achievements_checked_at": "DATETIME",
     }
     with engine.begin() as connection:
         for name, ddl in additions.items():
@@ -92,6 +96,10 @@ def _ensure_sqlite_columns() -> None:
         connection.exec_driver_sql(
             'CREATE UNIQUE INDEX IF NOT EXISTS "ix_games_ubisoft_space_id" '
             'ON "games" ("ubisoft_space_id")'
+        )
+        connection.exec_driver_sql(
+            'CREATE UNIQUE INDEX IF NOT EXISTS "ix_games_gog_product_id" '
+            'ON "games" ("gog_product_id")'
         )
 
 

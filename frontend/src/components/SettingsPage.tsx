@@ -89,6 +89,9 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
   const [xboxBusy, setXboxBusy] = useState(false)
   const [ubisoftTicket, setUbisoftTicket] = useState('')
   const [ubisoftBusy, setUbisoftBusy] = useState(false)
+  const [gogCode, setGogCode] = useState('')
+  const [gogBusy, setGogBusy] = useState(false)
+  const [gogAuthUrl, setGogAuthUrl] = useState<string | null>(null)
 
   const [newUsername, setNewUsername] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -112,12 +115,14 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
     setLoading(true)
     setError(null)
     try {
-      const [nextSettings, nextUsers] = await Promise.all([
+      const [nextSettings, nextUsers, gogAuth] = await Promise.all([
         api.settings(),
         api.users(),
+        api.gogAuthUrl().catch(() => null),
       ])
       setSettings(nextSettings)
       setUsers(nextUsers)
+      if (gogAuth) setGogAuthUrl(gogAuth.url)
       setTimezone(nextSettings.timezone)
       setSteamId(nextSettings.steam_id)
       setIgdbClientId(nextSettings.igdb_client_id)
@@ -425,6 +430,64 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
       reportError(ubisoftError)
     } finally {
       setUbisoftBusy(false)
+    }
+  }
+
+  const connectGog = async () => {
+    if (!gogCode.trim()) {
+      setError(t('settings.integrations.gogCodeHint'))
+      return
+    }
+    setGogBusy(true)
+    setError(null)
+    try {
+      const result = await api.connectGog(gogCode.trim())
+      setGogCode('')
+      setSettings(await api.settings())
+      flash(
+        result.message ??
+          t('settings.integrations.gogSynced', {
+            games: result.games_synced ?? 0,
+          }),
+      )
+    } catch (gogError) {
+      reportError(gogError)
+    } finally {
+      setGogBusy(false)
+    }
+  }
+
+  const syncGogNow = async () => {
+    setGogBusy(true)
+    setError(null)
+    try {
+      const result = await api.syncGog()
+      setSettings(await api.settings())
+      flash(
+        result.message ??
+          t('settings.integrations.gogSynced', {
+            games: result.games_synced ?? 0,
+          }),
+      )
+    } catch (gogError) {
+      reportError(gogError)
+    } finally {
+      setGogBusy(false)
+    }
+  }
+
+  const disconnectGog = async () => {
+    if (!window.confirm(t('settings.integrations.gogDisconnectConfirm'))) return
+    setGogBusy(true)
+    setError(null)
+    try {
+      await api.disconnectGog()
+      setSettings(await api.settings())
+      flash(t('settings.integrations.gogNotConnected'))
+    } catch (gogError) {
+      reportError(gogError)
+    } finally {
+      setGogBusy(false)
     }
   }
 
@@ -1182,6 +1245,111 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               </p>
             </div>
 
+            <div className="settings-group">
+              <div className="settings-group__head">
+                <h3>{t('settings.integrations.gog')}</h3>
+                <span
+                  className={`config-status${
+                    settings.gog_connected ? ' is-on' : ' is-off'
+                  }`}
+                >
+                  {settings.gog_connected
+                    ? t('settings.integrations.gogConnected')
+                    : t('settings.integrations.gogNotConnected')}
+                </span>
+              </div>
+              <p className="settings-hint">
+                {t('settings.integrations.gogSubtitle')}
+              </p>
+
+              {gogAuthUrl && (
+                <div className="settings-actions">
+                  <a
+                    className="button"
+                    href={gogAuthUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink size={14} strokeWidth={2} />
+                    {t('settings.integrations.gogOpenAuth')}
+                  </a>
+                </div>
+              )}
+
+              <label className="field">
+                <span>{t('settings.integrations.gogCode')}</span>
+                <input
+                  className="input"
+                  type="text"
+                  value={gogCode}
+                  onChange={(event) => setGogCode(event.target.value)}
+                  placeholder="code"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <small>{t('settings.integrations.gogCodeHint')}</small>
+              </label>
+
+              {settings.gog_connected && (
+                <div className="xbox-metrics">
+                  {settings.gog_username && (
+                    <span>
+                      GOG
+                      <strong>{settings.gog_username}</strong>
+                    </span>
+                  )}
+                  <span>
+                    {t('settings.integrations.gogLastSync')}
+                    <strong>
+                      {settings.gog_last_sync_at
+                        ? formatRelative(settings.gog_last_sync_at, lang)
+                        : t('common.never')}
+                    </strong>
+                  </span>
+                </div>
+              )}
+
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={connectGog}
+                  disabled={gogBusy || !gogCode.trim()}
+                >
+                  <Globe2 size={14} strokeWidth={2} />
+                  {t('settings.integrations.gogConnect')}
+                </button>
+                {settings.gog_connected && (
+                  <>
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={syncGogNow}
+                      disabled={gogBusy}
+                    >
+                      <RefreshCw
+                        size={14}
+                        strokeWidth={2}
+                        className={gogBusy ? 'is-spinning' : undefined}
+                      />
+                      {t('settings.integrations.gogSync')}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--danger"
+                      onClick={disconnectGog}
+                      disabled={gogBusy}
+                    >
+                      {t('settings.integrations.gogDisconnect')}
+                    </button>
+                  </>
+                )}
+              </div>
+              <p className="settings-hint">
+                {t('settings.integrations.gogNoPlaytime')}
+              </p>
+            </div>
+
             <button type="submit" className="button button--primary" disabled={saving}>
               <Save size={15} strokeWidth={2} />
               {t('settings.integrations.save')}
@@ -1653,6 +1821,20 @@ export function SettingsPage({ currentUser }: SettingsPageProps) {
               <code>GET /v1/profiles/gamesplayed?profileIds=...</code>
             </div>
             <p className="settings-hint">{t('settings.docs.ubisoftHint')}</p>
+          </section>
+
+          <section className="panel settings-panel">
+            <header className="card-head">
+              <div>
+                <h2>{t('settings.docs.gogTitle')}</h2>
+                <p>{t('settings.docs.gogSubtitle')}</p>
+              </div>
+            </header>
+            <div className="docs-code">
+              <code>auth.gog.com/auth → redirect code → Settings → Integrations → GOG</code>
+              <code>GET /user/data/games · gameplay.gog.com achievements</code>
+            </div>
+            <p className="settings-hint">{t('settings.docs.gogHint')}</p>
           </section>
         </div>
       )}

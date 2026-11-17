@@ -6,6 +6,8 @@ import type {
   DailyStats,
   Game,
   GameSession,
+  GogAuthUrl,
+  GogResult,
   HeatmapData,
   InfluxExportResult,
   SettingsUpdatePayload,
@@ -192,6 +194,10 @@ export const api = {
     }),
   syncUbisoft: () => post<UbisoftResult>('/ubisoft/sync'),
   disconnectUbisoft: () => post<{ ok: boolean }>('/ubisoft/disconnect'),
+  gogAuthUrl: () => get<GogAuthUrl>('/gog/auth-url'),
+  connectGog: (code: string) => post<GogResult>('/gog/connect', { code }),
+  syncGog: () => post<GogResult>('/gog/sync'),
+  disconnectGog: () => post<{ ok: boolean }>('/gog/disconnect'),
 
   downloadBackup: (format: 'json' | 'sqlite') =>
     download(`/admin/backup/export/${format}`),

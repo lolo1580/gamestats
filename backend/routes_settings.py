@@ -13,6 +13,9 @@ from security import AdminUser
 from settings_service import (
     SETTING_AGENT_API_KEY,
     SETTING_HOMEPAGE_API_TOKEN,
+    SETTING_GOG_LAST_SYNC,
+    SETTING_GOG_REFRESH_TOKEN,
+    SETTING_GOG_USERNAME,
     SETTING_IGDB_CLIENT_ID,
     SETTING_IGDB_CLIENT_SECRET,
     SETTING_INFLUX_BUCKET,
@@ -83,6 +86,11 @@ def _settings_out(db: Session) -> SettingsOut:
         ubisoft_name=integration.ubisoft_name,
         ubisoft_connected=integration.ubisoft_connected,
         ubisoft_last_sync_at=get_setting(db, SETTING_UBISOFT_LAST_SYNC) or None,
+        gog_refresh_token_hint=mask_secret(integration.gog_refresh_token),
+        gog_refresh_token_set=bool(integration.gog_refresh_token),
+        gog_username=integration.gog_username,
+        gog_connected=integration.gog_connected,
+        gog_last_sync_at=get_setting(db, SETTING_GOG_LAST_SYNC) or None,
     )
 
 

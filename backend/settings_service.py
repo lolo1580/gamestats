@@ -35,6 +35,10 @@ SETTING_UBISOFT_PROFILE_ID = "ubisoft_profile_id"
 SETTING_UBISOFT_USER_ID = "ubisoft_user_id"
 SETTING_UBISOFT_NAME = "ubisoft_name"
 SETTING_UBISOFT_LAST_SYNC = "ubisoft_last_sync_at"
+SETTING_GOG_REFRESH_TOKEN = "gog_refresh_token"
+SETTING_GOG_USER_ID = "gog_user_id"
+SETTING_GOG_USERNAME = "gog_username"
+SETTING_GOG_LAST_SYNC = "gog_last_sync_at"
 
 SECRET_SETTINGS = {
     SETTING_AGENT_API_KEY,
@@ -45,6 +49,7 @@ SECRET_SETTINGS = {
     SETTING_XBOX_REFRESH_TOKEN,
     SETTING_XBOX_DEVICE_CODE,
     SETTING_UBISOFT_REMEMBER_ME_TICKET,
+    SETTING_GOG_REFRESH_TOKEN,
 }
 
 SETTING_DEFAULTS = {
@@ -75,6 +80,10 @@ SETTING_DEFAULTS = {
     SETTING_UBISOFT_USER_ID: lambda: "",
     SETTING_UBISOFT_NAME: lambda: "",
     SETTING_UBISOFT_LAST_SYNC: lambda: "",
+    SETTING_GOG_REFRESH_TOKEN: lambda: "",
+    SETTING_GOG_USER_ID: lambda: "",
+    SETTING_GOG_USERNAME: lambda: "",
+    SETTING_GOG_LAST_SYNC: lambda: "",
 }
 
 
@@ -101,6 +110,9 @@ class IntegrationSettings:
     ubisoft_profile_id: str
     ubisoft_user_id: str
     ubisoft_name: str
+    gog_refresh_token: str
+    gog_user_id: str
+    gog_username: str
 
     @property
     def steam_configured(self) -> bool:
@@ -130,6 +142,10 @@ class IntegrationSettings:
             and self.ubisoft_profile_id
             and self.ubisoft_user_id
         )
+
+    @property
+    def gog_connected(self) -> bool:
+        return bool(self.gog_refresh_token and self.gog_user_id)
 
 
 def ensure_default_settings(db: Session) -> None:
@@ -189,6 +205,9 @@ def get_integration_settings(db: Session) -> IntegrationSettings:
         ubisoft_profile_id=get_setting(db, SETTING_UBISOFT_PROFILE_ID, ""),
         ubisoft_user_id=get_setting(db, SETTING_UBISOFT_USER_ID, ""),
         ubisoft_name=get_setting(db, SETTING_UBISOFT_NAME, ""),
+        gog_refresh_token=get_setting(db, SETTING_GOG_REFRESH_TOKEN, ""),
+        gog_user_id=get_setting(db, SETTING_GOG_USER_ID, ""),
+        gog_username=get_setting(db, SETTING_GOG_USERNAME, ""),
     )
 
 

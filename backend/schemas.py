@@ -93,6 +93,11 @@ class SettingsOut(BaseModel):
     ubisoft_name: str
     ubisoft_connected: bool
     ubisoft_last_sync_at: str | None
+    gog_refresh_token_hint: str
+    gog_refresh_token_set: bool
+    gog_username: str
+    gog_connected: bool
+    gog_last_sync_at: str | None
 
 
 class SettingsUpdate(BaseModel):
@@ -163,6 +168,23 @@ class UbisoftOut(BaseModel):
     message: str | None = None
 
 
+class GogConnectIn(BaseModel):
+    code: str = Field(min_length=8, max_length=4096)
+
+
+class GogAuthUrlOut(BaseModel):
+    url: str
+    redirect_uri: str
+
+
+class GogOut(BaseModel):
+    connected: bool
+    name: str | None = None
+    games_synced: int | None = None
+    last_sync_at: str | None = None
+    message: str | None = None
+
+
 class HeartbeatGameIn(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     process: str | None = Field(default=None, max_length=255)
@@ -210,6 +232,9 @@ class GameOut(BaseModel):
     ubisoft_sessions_count: int
     ubisoft_first_played_at: datetime | None
     ubisoft_last_played_at: datetime | None
+    gog_product_id: int | None
+    gog_achievements_total: int
+    gog_achievements_unlocked: int
 
 
 class TopGameOut(GameOut):

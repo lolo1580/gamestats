@@ -55,6 +55,11 @@ export interface AppSettings {
   ubisoft_name: string
   ubisoft_connected: boolean
   ubisoft_last_sync_at: string | null
+  gog_refresh_token_hint: string
+  gog_refresh_token_set: boolean
+  gog_username: string
+  gog_connected: boolean
+  gog_last_sync_at: string | null
 }
 
 export interface SettingsUpdatePayload {
@@ -105,6 +110,19 @@ export interface UbisoftResult {
   message: string | null
 }
 
+export interface GogAuthUrl {
+  url: string
+  redirect_uri: string
+}
+
+export interface GogResult {
+  connected: boolean
+  name: string | null
+  games_synced: number | null
+  last_sync_at: string | null
+  message: string | null
+}
+
 export interface InfluxExportResult {
   skipped: boolean
   reason: string | null
@@ -134,6 +152,9 @@ export interface Game {
   ubisoft_sessions_count: number
   ubisoft_first_played_at: string | null
   ubisoft_last_played_at: string | null
+  gog_product_id: number | null
+  gog_achievements_total: number
+  gog_achievements_unlocked: number
 }
 
 export interface TopGame extends Game {
