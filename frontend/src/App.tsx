@@ -1,0 +1,260 @@
+import { useCallback, useEffect, useState } from 'react'
+import { AlertTriangle, LoaderCircle, WifiOff } from 'lucide-react'
+import { api } from './api'
+import type {
+  AgentInfo,
+  DailyStats,
+  Game,
+  GameSession,
+  HeatmapData,
+  Page,
+  Summary,
+  Theme,
+  TopGame,
+} from './types'
+import { TopNav } from './components/TopNav'
+import { StatCards } from './components/StatCards'
+import { WeekChart } from './components/WeekChart'
+import { LiveCard } from './components/LiveCard'
+import { Heatmap } from './components/Heatmap'
+import { TopGames } from './components/TopGames'
+import { RecentSessions } from './components/RecentSessions'
+import { SessionsPage } from './components/SessionsPage'
+import { Library } from './components/Library'
+
+const PAGE_META: Record<Page, { title: string; subtitle: string }> = {
+  overview: {
+    title: "Vue d'ensemble",
+    subtitle: 'Votre activité de jeu et les sessions récentes.',
+  },
+  library: {
+    title: 'Bibliothèque',
+    subtitle: 'Tous les jeux synchronisés depuis Steam et le suivi PC.',
+  },
+  sessions: {
+    title: 'Sessions',
+    subtitle: "L'historique complet des parties détectées.",
+  },
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Erreur inconnue.'
+}
+
+export default function App() {
+  const [page, setPage] = useState<Page>('overview')
+  const [theme, setTheme] = useState<Theme>(() =>
+    document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
+  )
+  const [summary, setSummary] = useState<Summary | null>(null)
+  const [heatmap, setHeatmap] = useState<HeatmapData | null>(null)
+  const [daily, setDaily] = useState<DailyStats | null>(null)
+  const [topGames, setTopGames] = useState<TopGame[]>([])
+  const [sessions, setSessions] = useState<GameSession[]>([])
+  const [agents, setAgents] = useState<AgentInfo[]>([])
+  const [games, setGames] = useState<Game[] | null>(null)
+
+  const [loading, setLoading] = useState(true)
+  const [libraryLoading, setLibraryLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+
+  const loadDashboard = useCallback(async () => {
+    const [nextSummary, nextHeatmap, nextDaily, nextTopGames, nextSessions, nextAgents] =
+      await Promise.all([
+        api.summary(),
+        api.heatmap(365),
+        api.daily(14),
+        api.topGames(30, 6),
+        api.sessions(100),
+        api.agents(),
+      ])
+
+    setSummary(nextSummary)
+    setHeatmap(nextHeatmap)
+    setDaily(nextDaily)
+    setTopGames(nextTopGames)
+    setSessions(nextSessions)
+    setAgents(nextAgents)
+    setLastUpdated(new Date())
+    setError(null)
+  }, [])
+
+  const loadLibrary = useCallback(async () => {
+    setLibraryLoading(true)
+    try {
+      setGames(await api.games(1000))
+      setError(null)
+    } catch (loadError) {
+      setError(errorMessage(loadError))
+    } finally {
+      setLibraryLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    loadDashboard()
+      .catch((loadError: unknown) => {
+        if (active) setError(errorMessage(loadError))
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [loadDashboard])
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') {
+        loadDashboard().catch((loadError: unknown) => setError(errorMessage(loadError)))
+      }
+    }
+    const timer = window.setInterval(refresh, 30_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [loadDashboard])
+
+  useEffect(() => {
+    if (page === 'library' && games === null) {
+      void loadLibrary()
+    }
+  }, [page, games, loadLibrary])
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    document.title = `${PAGE_META[page].title} — GameStats`
+  }, [page])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#0a0e14' : '#f6f7f9')
+    try {
+      localStorage.setItem('gamestats-theme', theme)
+    } catch {
+      // Stockage indisponible : le thème reste appliqué pour la session.
+    }
+  }, [theme])
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    setError(null)
+    try {
+      await loadDashboard()
+      if (page === 'library') await loadLibrary()
+    } catch (loadError) {
+      setError(errorMessage(loadError))
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const meta = PAGE_META[page]
+  const updatedLabel = lastUpdated
+    ? `Actualisé à ${lastUpdated.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`
+    : 'Chargement…'
+
+  return (
+    <div className="app">
+      <TopNav
+        page={page}
+        onNavigate={setPage}
+        summary={summary}
+        agents={agents}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+        theme={theme}
+        onThemeChange={setTheme}
+      />
+
+      <main className="app-main">
+        <div className="page-head">
+          <div>
+            <h1>{meta.title}</h1>
+            <p>{meta.subtitle}</p>
+          </div>
+          <span className="page-head__updated">{updatedLabel}</span>
+        </div>
+
+        {error && (
+          <div className="error-banner" role="alert">
+            <AlertTriangle size={18} strokeWidth={2} />
+            <div>
+              <strong>Impossible de joindre le backend.</strong>
+              <span>{error}</span>
+            </div>
+            <button type="button" onClick={handleRefresh} disabled={refreshing}>
+              Réessayer
+            </button>
+          </div>
+        )}
+
+        {loading && !summary ? (
+          <div className="loading-state">
+            <span className="loading-state__icon">
+              <LoaderCircle size={22} strokeWidth={2.2} />
+            </span>
+            <span>Chargement de votre activité…</span>
+          </div>
+        ) : !summary || !heatmap ? (
+          <section className="panel">
+            <div className="empty-state">
+              <span className="empty-state__icon">
+                <WifiOff size={26} strokeWidth={1.7} />
+              </span>
+              <strong>Backend indisponible</strong>
+              <p>Vérifiez que les conteneurs tournent, puis actualisez la page.</p>
+            </div>
+          </section>
+        ) : page === 'overview' ? (
+          <div className="page-stack">
+            <StatCards summary={summary} daily={daily} />
+
+            <div className="dashboard-grid">
+              <WeekChart daily={daily} summary={summary} />
+              <LiveCard summary={summary} sessions={sessions} agents={agents} />
+            </div>
+
+            <div className="dashboard-grid dashboard-grid--secondary">
+              <Heatmap data={heatmap} />
+              <TopGames
+                games={topGames}
+                days={30}
+                onBrowse={() => setPage('library')}
+              />
+            </div>
+
+            <RecentSessions
+              sessions={sessions.slice(0, 8)}
+              onViewAll={() => setPage('sessions')}
+            />
+          </div>
+        ) : page === 'sessions' ? (
+          <SessionsPage sessions={sessions} loading={loading} />
+        ) : (
+          <Library
+            games={games ?? []}
+            loading={libraryLoading || (games === null && !error)}
+          />
+        )}
+
+        <footer className="app-footer">
+          <span>GameStats · auto-hébergé</span>
+          <span>{updatedLabel}</span>
+        </footer>
+      </main>
+    </div>
+  )
+}
