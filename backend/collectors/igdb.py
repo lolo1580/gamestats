@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from config import get_settings
 from models import Game, utcnow
+from settings_service import get_integration_settings
 from utils import normalize_name
 
 logger = logging.getLogger(__name__)
@@ -127,11 +128,12 @@ def _cover_url(raw: str | None) -> str | None:
 
 
 def enrich_games(db: Session, limit: int | None = None) -> dict:
-    settings = get_settings()
-    if not settings.igdb_configured:
+    config = get_settings()
+    integration = get_integration_settings(db)
+    if not integration.igdb_configured:
         return {"skipped": True, "reason": "IGDB_CLIENT_ID / IGDB_CLIENT_SECRET non configurés."}
 
-    max_games = settings.igdb_enrich_limit if limit is None else limit
+    max_games = config.igdb_enrich_limit if limit is None else limit
     if max_games <= 0:
         return {"skipped": False, "enriched": 0}
 
@@ -146,7 +148,7 @@ def enrich_games(db: Session, limit: int | None = None) -> dict:
     ).all()
 
     enriched = 0
-    with IGDBCollector(settings.igdb_client_id, settings.igdb_client_secret) as collector:
+    with IGDBCollector(integration.igdb_client_id, integration.igdb_client_secret) as collector:
         for index, game in enumerate(games):
             if index:
                 time.sleep(0.3)  # Respecte la limite IGDB (~4 req/s).

@@ -72,34 +72,27 @@ def start_scheduler() -> BackgroundScheduler:
         name="Clôture des sessions agent inactives",
     )
 
-    if settings.steam_configured:
-        scheduler.add_job(
-            _steam_job,
-            IntervalTrigger(minutes=max(5, settings.steam_sync_minutes)),
-            id="sync-steam",
-            name="Synchronisation Steam",
-            next_run_time=utcnow() + timedelta(seconds=10),
-        )
-    else:
-        logger.warning("Steam non configuré : la synchronisation est désactivée.")
-
-    if settings.igdb_configured:
-        scheduler.add_job(
-            _igdb_job,
-            IntervalTrigger(minutes=max(15, settings.igdb_sync_minutes)),
-            id="enrich-igdb",
-            name="Enrichissement IGDB",
-            next_run_time=utcnow() + timedelta(seconds=30),
-        )
-    else:
-        logger.warning("IGDB non configuré : les jaquettes ne seront pas enrichies.")
+    scheduler.add_job(
+        _steam_job,
+        IntervalTrigger(minutes=max(5, settings.steam_sync_minutes)),
+        id="sync-steam",
+        name="Synchronisation Steam",
+        next_run_time=utcnow() + timedelta(seconds=10),
+    )
+    scheduler.add_job(
+        _igdb_job,
+        IntervalTrigger(minutes=max(15, settings.igdb_sync_minutes)),
+        id="enrich-igdb",
+        name="Enrichissement IGDB",
+        next_run_time=utcnow() + timedelta(seconds=30),
+    )
 
     scheduler.start()
     _scheduler = scheduler
     logger.info(
-        "Planificateur démarré (Steam: %s, IGDB: %s).",
-        "oui" if settings.steam_configured else "non",
-        "oui" if settings.igdb_configured else "non",
+        "Planificateur démarré (Steam: %s min, IGDB: %s min, configuration via /api/settings).",
+        max(5, settings.steam_sync_minutes),
+        max(15, settings.igdb_sync_minutes),
     )
     return scheduler
 

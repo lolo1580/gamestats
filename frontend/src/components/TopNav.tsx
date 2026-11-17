@@ -1,15 +1,19 @@
+import { useEffect, useRef, useState } from 'react'
 import {
+  ChevronDown,
   Gamepad2,
   History,
   LayoutDashboard,
   LibraryBig,
-  Moon,
+  LogOut,
   RefreshCw,
-  Sun,
+  Settings,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { AgentInfo, Page, Summary, Theme } from '../types'
-import { pluralize } from '../format'
+import type { AgentInfo, CurrentUser, Page, Summary, Theme } from '../types'
+import { initials, pluralize } from '../format'
+import { ThemeToggle } from './ThemeToggle'
+import { docsLinks } from '../api'
 
 interface TopNavProps {
   page: Page
@@ -20,6 +24,8 @@ interface TopNavProps {
   refreshing: boolean
   theme: Theme
   onThemeChange: (theme: Theme) => void
+  currentUser: CurrentUser
+  onLogout: () => void
 }
 
 interface NavItem {
@@ -43,6 +49,8 @@ export function TopNav({
   refreshing,
   theme,
   onThemeChange,
+  currentUser,
+  onLogout,
 }: TopNavProps) {
   const onlineAgents = agents.filter((agent) => agent.online)
   const active = summary?.active_count ?? 0
@@ -54,13 +62,32 @@ export function TopNav({
         ? 'Agent en ligne'
         : 'Hors ligne'
 
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [menuOpen])
+
+  const navigate = (next: Page) => {
+    setMenuOpen(false)
+    onNavigate(next)
+  }
+
   return (
     <header className="app-header">
       <div className="app-header__inner">
         <button
           type="button"
           className="brand"
-          onClick={() => onNavigate('overview')}
+          onClick={() => navigate('overview')}
           aria-label="GameStats — vue d'ensemble"
         >
           <span className="brand__logo">
@@ -77,7 +104,7 @@ export function TopNav({
                 key={item.id}
                 type="button"
                 className={`header-nav__link${page === item.id ? ' is-active' : ''}`}
-                onClick={() => onNavigate(item.id)}
+                onClick={() => navigate(item.id)}
                 aria-current={page === item.id ? 'page' : undefined}
               >
                 <Icon size={15} strokeWidth={2} />
@@ -91,33 +118,13 @@ export function TopNav({
         </nav>
 
         <div className="header-actions">
-          <div className="theme-switch" role="group" aria-label="Thème de l'interface">
-            <button
-              type="button"
-              className={`theme-switch__button${theme === 'light' ? ' is-active' : ''}`}
-              onClick={() => onThemeChange('light')}
-              aria-pressed={theme === 'light'}
-              aria-label="Thème clair"
-              title="Thème clair"
-            >
-              <Sun size={15} strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              className={`theme-switch__button${theme === 'dark' ? ' is-active' : ''}`}
-              onClick={() => onThemeChange('dark')}
-              aria-pressed={theme === 'dark'}
-              aria-label="Thème sombre"
-              title="Thème sombre"
-            >
-              <Moon size={15} strokeWidth={2} />
-            </button>
-          </div>
+          <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
 
           <span className={`status-pill${isOnline ? ' is-online' : ''}`}>
             <span className="status-pill__dot" aria-hidden="true" />
             {statusLabel}
           </span>
+
           <button
             type="button"
             className="button button--icon"
@@ -132,6 +139,69 @@ export function TopNav({
             />
             <span className="button__label">Actualiser</span>
           </button>
+
+          <div className="user-menu" ref={menuRef}>
+            <button
+              type="button"
+              className={`user-menu__trigger${menuOpen ? ' is-open' : ''}`}
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+            >
+              <span className="user-menu__avatar">{initials(currentUser.username)}</span>
+              <span className="user-menu__name">{currentUser.username}</span>
+              <ChevronDown size={13} strokeWidth={2} className="user-menu__chevron" />
+            </button>
+
+            {menuOpen && (
+              <div className="user-menu__dropdown" role="menu">
+                <div className="user-menu__header">
+                  <strong>{currentUser.username}</strong>
+                  <span>{currentUser.email || 'Aucun email'}</span>
+                  <small>{currentUser.role === 'admin' ? 'Administrateur' : 'Lecteur'}</small>
+                </div>
+
+                {currentUser.role === 'admin' && (
+                  <button
+                    type="button"
+                    className="user-menu__item"
+                    role="menuitem"
+                    onClick={() => navigate('settings')}
+                  >
+                    <Settings size={15} strokeWidth={2} />
+                    Paramètres
+                  </button>
+                )}
+
+                <a
+                  className="user-menu__item"
+                  role="menuitem"
+                  href={docsLinks.swagger}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <span className="user-menu__item-icon">API</span>
+                  Documentation API
+                </a>
+
+                <div className="user-menu__separator" />
+
+                <button
+                  type="button"
+                  className="user-menu__item user-menu__item--danger"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onLogout()
+                  }}
+                >
+                  <LogOut size={15} strokeWidth={2} />
+                  Déconnexion
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

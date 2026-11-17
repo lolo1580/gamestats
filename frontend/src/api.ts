@@ -1,18 +1,39 @@
 import type {
   AgentInfo,
+  AppSettings,
+  AuthStatus,
+  CurrentUser,
   DailyStats,
   Game,
   GameSession,
   HeatmapData,
+  SettingsUpdatePayload,
   Summary,
   TopGame,
+  UserRole,
 } from './types'
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
 
-async function get<T>(path: string): Promise<T> {
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { Accept: 'application/json' },
+    ...init,
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init.headers,
+    },
   })
 
   if (!response.ok) {
@@ -23,13 +44,58 @@ async function get<T>(path: string): Promise<T> {
     } catch {
       // Réponse non JSON : on garde le message générique.
     }
-    throw new Error(detail)
+    throw new ApiError(detail, response.status)
+  }
+
+  if (response.status === 204) {
+    return undefined as T
   }
 
   return (await response.json()) as T
 }
 
+function get<T>(path: string): Promise<T> {
+  return request<T>(path)
+}
+
+function post<T>(path: string, body?: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'POST',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+}
+
+function patch<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+function del<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' })
+}
+
+export const docsLinks = {
+  swagger: import.meta.env.DEV ? 'http://localhost:8000/docs' : '/docs',
+  redoc: import.meta.env.DEV ? 'http://localhost:8000/redoc' : '/redoc',
+  readme: 'https://github.com/lolo1580/gamestats/blob/main/README.md',
+}
+
 export const api = {
+  authStatus: () => get<AuthStatus>('/auth/status'),
+  setup: (payload: {
+    username: string
+    email?: string | null
+    password: string
+  }) => post<CurrentUser>('/auth/setup', payload),
+  login: (payload: { identifier: string; password: string }) =>
+    post<CurrentUser>('/auth/login', payload),
+  logout: () => post<{ ok: boolean }>('/auth/logout'),
+  me: () => get<CurrentUser>('/auth/me'),
+  changePassword: (payload: { current_password: string; new_password: string }) =>
+    post<{ ok: boolean }>('/auth/password', payload),
+
   summary: () => get<Summary>('/stats/summary'),
   heatmap: (days = 365) => get<HeatmapData>(`/stats/heatmap?days=${days}`),
   daily: (days = 14) => get<DailyStats>(`/stats/daily?days=${days}`),
@@ -38,4 +104,28 @@ export const api = {
   sessions: (limit = 100) => get<GameSession[]>(`/sessions?limit=${limit}`),
   games: (limit = 1000) => get<Game[]>(`/games?limit=${limit}`),
   agents: () => get<AgentInfo[]>('/agents'),
+
+  users: () => get<CurrentUser[]>('/users'),
+  createUser: (payload: {
+    username: string
+    email?: string | null
+    password: string
+    role: UserRole
+  }) => post<CurrentUser>('/users', payload),
+  updateUser: (
+    id: number,
+    payload: {
+      email?: string | null
+      role?: UserRole
+      is_active?: boolean
+      password?: string
+    },
+  ) => patch<CurrentUser>(`/users/${id}`, payload),
+  deleteUser: (id: number) => del<void>(`/users/${id}`),
+
+  settings: () => get<AppSettings>('/settings'),
+  updateSettings: (payload: SettingsUpdatePayload) =>
+    patch<AppSettings>('/settings', payload),
+  revealAgentKey: () => get<{ agent_api_key: string }>('/settings/agent-key'),
+  rotateAgentKey: () => post<{ agent_api_key: string }>('/settings/agent-key/rotate'),
 }

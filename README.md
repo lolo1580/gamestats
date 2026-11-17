@@ -23,8 +23,15 @@ The interface is currently in French and ships with **dark and light themes**.
 - **Library** — search, sort, inspect playtime and achievement progress.
 - **Light / dark theme** — switch from the header; the preference is stored in
   the browser and applied before the first render.
+- **Accounts and roles** — first-run admin setup, login/logout, local sessions,
+  user management, and `admin` / `viewer` roles.
+- **Backend settings** — manage the agent key, timezone, Steam and IGDB
+  credentials from the UI. Secrets are masked in responses.
+- **Protected documentation** — Swagger UI and ReDoc require an authenticated
+  session, just like the dashboard.
 - **Docker Compose** — backend, SQLite persistence, and an nginx-served frontend.
-- **Single shared secret** — write endpoints are protected by an agent API key.
+- **Authentication** — write endpoints are protected by an agent API key and the
+  web UI is protected by user sessions.
 
 ## Architecture
 
@@ -74,25 +81,33 @@ The backend port must be reachable from the Windows PC running the agent.
 
 SQLite data is stored in `./data/gamestats.db` on the host.
 
+On first launch, open the dashboard and create the administrator account. There
+is no default password. The Swagger and ReDoc pages require this session too.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and adjust the values:
 
 | Variable                | Default              | Description                                                        |
 | ----------------------- | -------------------- | ------------------------------------------------------------------ |
-| `AGENT_API_KEY`         | `change-me`          | Shared secret for the agent and admin endpoints. Change it.        |
-| `TIMEZONE`              | `Europe/Paris`       | Timezone used by the heatmap, daily totals, and "today" metrics.   |
-| `STEAM_API_KEY`         | empty                | Steam Web API key.                                                 |
-| `STEAM_ID`              | empty                | SteamID64 of the library owner.                                    |
-| `IGDB_CLIENT_ID`        | empty                | Twitch application client ID.                                      |
-| `IGDB_CLIENT_SECRET`    | empty                | Twitch application client secret.                                  |
+| `AGENT_API_KEY`         | `change-me`          | Initial agent secret. Editable in Settings.                        |
+| `TIMEZONE`              | `Europe/Paris`       | Initial timezone. Editable in Settings.                            |
+| `STEAM_API_KEY`         | empty                | Initial Steam Web API key. Editable in Settings.                   |
+| `STEAM_ID`              | empty                | Initial SteamID64. Editable in Settings.                           |
+| `IGDB_CLIENT_ID`        | empty                | Initial Twitch client ID. Editable in Settings.                    |
+| `IGDB_CLIENT_SECRET`    | empty                | Initial Twitch client secret. Editable in Settings.                |
 | `FRONTEND_PORT`         | `8090`               | Host port for the dashboard.                                       |
 | `BACKEND_PORT`          | `8091`               | Host port for the API (must be reachable by the agent).            |
 | `AGENT_STALE_SECONDS`   | `180`                | Time without a heartbeat before an agent session is closed.        |
 | `STEAM_SYNC_MINUTES`    | `15`                 | Steam synchronization interval.                                    |
 | `IGDB_SYNC_MINUTES`     | `60`                 | IGDB enrichment interval.                                          |
+| `SESSION_DAYS`          | `7`                  | Browser session lifetime, in days.                                |
+| `COOKIE_SECURE`         | `false`              | Set to `true` when serving the app over HTTPS.                     |
 | `SCHEDULER_ENABLED`     | `true`               | Set to `false` to disable background jobs.                         |
 | `LOG_LEVEL`             | `INFO`               | Backend log level.                                                 |
+
+Environment values seed the database on first start. Integration credentials and
+the agent key can then be changed in **Settings** without restarting the stack.
 
 Generate an agent key with:
 
@@ -110,8 +125,8 @@ only.
 1. Create a Steam Web API key: https://steamcommunity.com/dev/apikey
 2. Find your SteamID64: https://steamid.io/
 3. Make sure your profile and **game details** are public.
-4. Set `STEAM_API_KEY` and `STEAM_ID` in `.env`, then run
-   `docker compose up -d`.
+4. Set `STEAM_API_KEY` and `STEAM_ID` in **Settings → Intégrations** (or seed
+   them in `.env` before the first start).
 
 The first synchronization records a baseline and does not create fake sessions.
 Later synchronizations turn increases in total playtime into approximate Steam
@@ -123,8 +138,10 @@ games.
 IGDB enrichment is optional.
 
 1. Create a Twitch application: https://dev.twitch.tv/console/apps
-2. Set `IGDB_CLIENT_ID` and `IGDB_CLIENT_SECRET` in `.env`.
-3. Restart the backend.
+2. Set `IGDB_CLIENT_ID` and `IGDB_CLIENT_SECRET` in **Settings → Intégrations**
+   (or seed them in `.env` before the first start).
+
+Enrichment starts with the next scheduled job; no restart is required.
 
 Games without covers or genres are enriched in small batches (8 per hour by
 default) so the Steam sync is never blocked by IGDB rate limits.
@@ -132,6 +149,8 @@ default) so the Steam sync is never blocked by IGDB rate limits.
 ## Windows agent
 
 Requirements: Python 3.10+ on Windows, on the same network as the backend.
+The agent key is available in **Settings → Général** (it can also be seeded with
+`AGENT_API_KEY` before the first start).
 
 ```powershell
 cd agent-windows
@@ -202,20 +221,41 @@ not be visible. Check the log file if nothing appears in the dashboard.
 | `GET`  | `/api/games`              | Library (`?search=&sort=playtime`)               |
 | `GET`  | `/api/agents`             | Known agents and online state                    |
 | `GET`  | `/api/health`             | Backend health                                   |
-| `POST` | `/api/admin/sync/steam`   | Force a Steam sync (`X-Agent-Key`)               |
-| `POST` | `/api/admin/enrich/igdb`  | Force IGDB enrichment (`X-Agent-Key`)            |
+| `POST` | `/api/auth/setup`         | Create the first administrator                   |
+| `POST` | `/api/auth/login`         | Start a browser session                          |
+| `POST` | `/api/auth/logout`        | End the current session                          |
+| `GET`  | `/api/auth/me`            | Current user                                     |
+| `POST` | `/api/auth/password`      | Change your own password                         |
+| `GET`  | `/api/users`              | List users (admin)                               |
+| `POST` | `/api/users`              | Create a user (admin)                            |
+| `PATCH` | `/api/users/{id}`         | Update a user (admin)                            |
+| `DELETE` | `/api/users/{id}`        | Delete a user (admin)                            |
+| `GET`  | `/api/settings`           | Read masked settings (admin)                     |
+| `PATCH` | `/api/settings`           | Update integrations and timezone (admin)         |
+| `GET`  | `/api/settings/agent-key` | Reveal the agent key (admin)                     |
+| `POST` | `/api/settings/agent-key/rotate` | Rotate the agent key (admin)              |
+| `POST` | `/api/admin/sync/steam`   | Force a Steam sync (admin session)               |
+| `POST` | `/api/admin/enrich/igdb`  | Force IGDB enrichment (admin session)            |
 
-Interactive OpenAPI documentation is available at `/docs` on the backend port.
+Interactive OpenAPI documentation is available at `/docs` and `/redoc`. Both
+require a logged-in session. Dashboard and library endpoints also require a
+session; only `/api/health`, authentication routes, and the agent heartbeat are
+public.
 
-Force a Steam synchronization:
+Force a Steam synchronization with an admin session:
 
 ```bash
-curl -X POST -H "X-Agent-Key: $AGENT_API_KEY" \
+curl -c /tmp/gamestats-cookies.txt -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"identifier":"admin","password":"YOUR_PASSWORD"}' \
+  http://localhost:8091/api/auth/login
+
+curl -b /tmp/gamestats-cookies.txt -X POST \
   http://localhost:8091/api/admin/sync/steam
 ```
 
-Read endpoints are not authenticated. Do not expose the backend port directly to
-the internet; keep the service behind a reverse proxy or restrict it to your LAN.
+Do not expose the backend port directly to the internet; keep the service behind
+a reverse proxy or restrict it to your LAN.
 
 ## Project layout
 
@@ -225,6 +265,11 @@ gamestats/
 ├── .env.example
 ├── backend/
 │   ├── main.py              # FastAPI app and routes
+│   ├── security.py          # Sessions, password hashing, role checks
+│   ├── settings_service.py  # DB-backed settings and masking
+│   ├── routes_auth.py       # Setup, login, logout, account
+│   ├── routes_users.py      # User management
+│   ├── routes_settings.py   # Integration settings
 │   ├── heartbeat.py         # Agent session lifecycle
 │   ├── stats.py             # Summary, daily, heatmap, top games
 │   ├── scheduler.py         # Background jobs
@@ -233,7 +278,7 @@ gamestats/
 │   │   └── igdb.py
 │   └── tests/
 ├── frontend/
-│   └── src/                 # React dashboard, sessions, library
+│   └── src/                 # Auth, dashboard, settings, sessions, library
 └── agent-windows/
     ├── tracker.py
     └── games.json
@@ -278,7 +323,8 @@ npm run build
 
 ## Troubleshooting
 
-- **401 on heartbeat** — the agent key and `AGENT_API_KEY` do not match.
+- **401 on heartbeat** — the agent key does not match the key in
+  **Settings → Général**.
 - **Steam library is empty** — check that the profile and game details are
   public, and that `STEAM_ID` is a SteamID64. See `docker compose logs -f backend`.
 - **No covers** — IGDB credentials are missing, invalid, or rate-limited. The
@@ -292,11 +338,18 @@ npm run build
 
 ## Security notes
 
-- The agent and admin endpoints require the `X-Agent-Key` header.
-- The default `AGENT_API_KEY` is `change-me`; always change it before exposing the
+- Dashboard, library, session, user, settings, Swagger, and ReDoc endpoints
+  require an authenticated browser session.
+- The agent heartbeat uses the `X-Agent-Key` header. The key is managed in
+  **Settings** and can be rotated at any time.
+- Admin endpoints require an `admin` account. `viewer` accounts are read-only.
+- Passwords are hashed with Argon2. Session tokens are random, stored hashed in
+  SQLite, and sent in an HttpOnly, SameSite=Lax cookie.
+- Set `COOKIE_SECURE=true` when the app is served over HTTPS.
+- Integration secrets are stored in SQLite and masked in API responses. Protect
+  the `data` directory and backups accordingly.
+- The default `AGENT_API_KEY` is `change-me`; change it before exposing the
   service on a network.
-- Read endpoints (dashboard, sessions, library) are intentionally unauthenticated.
-  Restrict access to your LAN or add authentication at the reverse proxy.
 - `.env`, the SQLite database, and local build artifacts are excluded from Git.
 
 ## Known limitations

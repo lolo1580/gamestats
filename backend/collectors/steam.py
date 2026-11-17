@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from config import get_settings
 from models import Game, GameSession, PlaytimeSnapshot, utcnow
+from settings_service import get_integration_settings
 from utils import ensure_utc, normalize_name
 
 logger = logging.getLogger(__name__)
@@ -99,8 +100,9 @@ def _achievement_key(game: Game) -> float:
 
 
 def sync_steam_library(db: Session) -> dict:
-    settings = get_settings()
-    if not settings.steam_configured:
+    config = get_settings()
+    integration = get_integration_settings(db)
+    if not integration.steam_configured:
         return {"skipped": True, "reason": "STEAM_API_KEY / STEAM_ID non configurés."}
 
     now = utcnow()
@@ -109,7 +111,7 @@ def sync_steam_library(db: Session) -> dict:
     sessions_created = 0
     achievement_candidates: list[Game] = []
 
-    with SteamCollector(settings.steam_api_key, settings.steam_id) as collector:
+    with SteamCollector(integration.steam_api_key, integration.steam_id) as collector:
         owned_games = collector.owned_games()
         logger.info("Steam : %s jeu(x) dans la bibliothèque.", len(owned_games))
 
@@ -222,7 +224,7 @@ def sync_steam_library(db: Session) -> dict:
 
         achievement_candidates.sort(key=_achievement_key, reverse=True)
         achievements_synced = 0
-        for game in achievement_candidates[: max(0, settings.steam_achievement_limit)]:
+        for game in achievement_candidates[: max(0, config.steam_achievement_limit)]:
             if game.steam_app_id is None:
                 continue
             try:

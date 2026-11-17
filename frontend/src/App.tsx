@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, LoaderCircle, WifiOff } from 'lucide-react'
-import { api } from './api'
+import { api, ApiError } from './api'
 import type {
   AgentInfo,
+  CurrentUser,
   DailyStats,
   Game,
   GameSession,
@@ -21,6 +22,8 @@ import { TopGames } from './components/TopGames'
 import { RecentSessions } from './components/RecentSessions'
 import { SessionsPage } from './components/SessionsPage'
 import { Library } from './components/Library'
+import { SettingsPage } from './components/SettingsPage'
+import { AuthScreen } from './components/AuthScreen'
 
 const PAGE_META: Record<Page, { title: string; subtitle: string }> = {
   overview: {
@@ -35,6 +38,10 @@ const PAGE_META: Record<Page, { title: string; subtitle: string }> = {
     title: 'Sessions',
     subtitle: "L'historique complet des parties détectées.",
   },
+  settings: {
+    title: 'Paramètres',
+    subtitle: 'Comptes, intégrations et documentation du backend.',
+  },
 }
 
 function errorMessage(error: unknown): string {
@@ -46,6 +53,12 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>(() =>
     document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
   )
+
+  const [authChecked, setAuthChecked] = useState(false)
+  const [needsSetup, setNeedsSetup] = useState(false)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [authError, setAuthError] = useState<string | null>(null)
+
   const [summary, setSummary] = useState<Summary | null>(null)
   const [heatmap, setHeatmap] = useState<HeatmapData | null>(null)
   const [daily, setDaily] = useState<DailyStats | null>(null)
@@ -59,6 +72,48 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+
+  const resetData = () => {
+    setSummary(null)
+    setHeatmap(null)
+    setDaily(null)
+    setTopGames([])
+    setSessions([])
+    setAgents([])
+    setGames(null)
+    setLastUpdated(null)
+  }
+
+  const handleApiError = (apiError: unknown): boolean => {
+    if (apiError instanceof ApiError && apiError.status === 401) {
+      setCurrentUser(null)
+      resetData()
+      return true
+    }
+    setError(errorMessage(apiError))
+    return false
+  }
+
+  useEffect(() => {
+    let active = true
+    api
+      .authStatus()
+      .then((status) => {
+        if (!active) return
+        setNeedsSetup(status.needs_setup)
+        setCurrentUser(status.user)
+        setAuthError(null)
+      })
+      .catch((statusError: unknown) => {
+        if (active) setAuthError(errorMessage(statusError))
+      })
+      .finally(() => {
+        if (active) setAuthChecked(true)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const loadDashboard = useCallback(async () => {
     const [nextSummary, nextHeatmap, nextDaily, nextTopGames, nextSessions, nextAgents] =
@@ -87,18 +142,19 @@ export default function App() {
       setGames(await api.games(1000))
       setError(null)
     } catch (loadError) {
-      setError(errorMessage(loadError))
+      handleApiError(loadError)
     } finally {
       setLibraryLoading(false)
     }
   }, [])
 
   useEffect(() => {
+    if (!currentUser) return
     let active = true
     setLoading(true)
     loadDashboard()
       .catch((loadError: unknown) => {
-        if (active) setError(errorMessage(loadError))
+        if (active) handleApiError(loadError)
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -106,12 +162,13 @@ export default function App() {
     return () => {
       active = false
     }
-  }, [loadDashboard])
+  }, [currentUser, loadDashboard])
 
   useEffect(() => {
+    if (!currentUser) return
     const refresh = () => {
       if (document.visibilityState === 'visible') {
-        loadDashboard().catch((loadError: unknown) => setError(errorMessage(loadError)))
+        loadDashboard().catch((loadError: unknown) => handleApiError(loadError))
       }
     }
     const timer = window.setInterval(refresh, 30_000)
@@ -120,13 +177,19 @@ export default function App() {
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', refresh)
     }
-  }, [loadDashboard])
+  }, [currentUser, loadDashboard])
 
   useEffect(() => {
-    if (page === 'library' && games === null) {
+    if (currentUser && page === 'library' && games === null) {
       void loadLibrary()
     }
-  }, [page, games, loadLibrary])
+  }, [currentUser, page, games, loadLibrary])
+
+  useEffect(() => {
+    if (currentUser && page === 'settings' && currentUser.role !== 'admin') {
+      setPage('overview')
+    }
+  }, [currentUser, page])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -145,6 +208,24 @@ export default function App() {
     }
   }, [theme])
 
+  const handleAuthenticated = (user: CurrentUser) => {
+    setCurrentUser(user)
+    setNeedsSetup(false)
+    setAuthError(null)
+    setPage('overview')
+  }
+
+  const handleLogout = async () => {
+    try {
+      await api.logout()
+    } finally {
+      setCurrentUser(null)
+      setNeedsSetup(false)
+      resetData()
+      setPage('overview')
+    }
+  }
+
   const handleRefresh = async () => {
     setRefreshing(true)
     setError(null)
@@ -152,10 +233,35 @@ export default function App() {
       await loadDashboard()
       if (page === 'library') await loadLibrary()
     } catch (loadError) {
-      setError(errorMessage(loadError))
+      handleApiError(loadError)
     } finally {
       setRefreshing(false)
     }
+  }
+
+  if (!authChecked) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card auth-card--loading">
+          <span className="loading-state__icon">
+            <LoaderCircle size={22} strokeWidth={2.2} className="is-spinning" />
+          </span>
+          <p>Connexion au backend…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!currentUser) {
+    return (
+      <AuthScreen
+        needsSetup={needsSetup}
+        theme={theme}
+        onThemeChange={setTheme}
+        onAuthenticated={handleAuthenticated}
+        initialError={authError}
+      />
+    )
   }
 
   const meta = PAGE_META[page]
@@ -177,6 +283,8 @@ export default function App() {
         refreshing={refreshing}
         theme={theme}
         onThemeChange={setTheme}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       <main className="app-main">
@@ -201,10 +309,12 @@ export default function App() {
           </div>
         )}
 
-        {loading && !summary ? (
+        {page === 'settings' ? (
+          <SettingsPage currentUser={currentUser} />
+        ) : loading && !summary ? (
           <div className="loading-state">
             <span className="loading-state__icon">
-              <LoaderCircle size={22} strokeWidth={2.2} />
+              <LoaderCircle size={22} strokeWidth={2.2} className="is-spinning" />
             </span>
             <span>Chargement de votre activité…</span>
           </div>

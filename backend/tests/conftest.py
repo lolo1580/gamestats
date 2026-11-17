@@ -22,6 +22,12 @@ from fastapi.testclient import TestClient
 from database import Base, engine
 from main import app
 
+ADMIN_CREDENTIALS = {
+    "username": "admin",
+    "email": "admin@example.com",
+    "password": "admin-password",
+}
+
 
 @pytest.fixture(autouse=True)
 def clean_database():
@@ -31,8 +37,21 @@ def clean_database():
 
 
 @pytest.fixture
-def client():
+def admin_credentials():
+    return dict(ADMIN_CREDENTIALS)
+
+
+@pytest.fixture
+def anon_client():
     with TestClient(app) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def client(admin_credentials):
+    with TestClient(app) as test_client:
+        response = test_client.post("/api/auth/setup", json=admin_credentials)
+        assert response.status_code == 200, response.text
         yield test_client
 
 

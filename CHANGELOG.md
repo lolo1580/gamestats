@@ -7,7 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- First-run administrator setup, login/logout, and local browser sessions.
+- User management with `admin` and `viewer` roles, account activation, password
+  resets, and last-admin safeguards.
+- Argon2 password hashing and hashed session tokens stored in SQLite.
+- Database-backed settings for timezone, agent key, Steam, and IGDB credentials,
+  with masked secret values in API responses.
+- Agent key reveal and rotation from the settings UI.
+- Protected Swagger UI and ReDoc pages.
+- Settings interface with General, Integrations, Users, Account, and
+  Documentation sections.
+- User menu with account, settings, API documentation, and logout actions.
+
+### Changed
+
+- Dashboard, library, sessions, stats, agents, user, and settings endpoints now
+  require an authenticated session.
+- Admin sync/enrichment endpoints now require an administrator session instead
+  of the agent key.
+- Steam and IGDB scheduled jobs always run and skip cleanly while integrations
+  are unconfigured, so settings changes apply without a restart.
+- Integration credentials and the agent key can be updated without restarting
+  the backend.
+- README and changelog are maintained in English.
+
+### Security
+
+- Session cookies are HttpOnly and SameSite=Lax; `COOKIE_SECURE` enables the
+  Secure flag for HTTPS deployments.
+- Integration secrets are stored in SQLite and never returned unmasked.
+- Read endpoints are no longer public.
 
 ## [1.0.0] - 2026-11-17
 

@@ -18,6 +18,42 @@ def test_health(client):
     body = response.json()
     assert body["status"] == "ok"
     assert body["steam_configured"] is False
+    assert body["setup_required"] is False
+    assert client.get("/docs").status_code == 200
+    assert client.get("/redoc").status_code == 200
+
+
+def test_setup_login_logout(anon_client, admin_credentials):
+    status = anon_client.get("/api/auth/status").json()
+    assert status["needs_setup"] is True
+    assert status["authenticated"] is False
+    assert anon_client.get("/api/stats/summary").status_code == 401
+    assert anon_client.get("/docs").status_code == 401
+
+    setup = anon_client.post("/api/auth/setup", json=admin_credentials)
+    assert setup.status_code == 200, setup.text
+    assert setup.json()["role"] == "admin"
+    assert anon_client.get("/api/stats/summary").status_code == 200
+
+    second_setup = anon_client.post("/api/auth/setup", json=admin_credentials)
+    assert second_setup.status_code == 409
+
+    assert anon_client.post("/api/auth/logout").status_code == 200
+    assert anon_client.get("/api/auth/status").json()["authenticated"] is False
+    assert anon_client.get("/api/stats/summary").status_code == 401
+
+    bad_login = anon_client.post(
+        "/api/auth/login",
+        json={"identifier": "admin", "password": "wrong-password"},
+    )
+    assert bad_login.status_code == 401
+
+    login = anon_client.post(
+        "/api/auth/login",
+        json={"identifier": "admin", "password": admin_credentials["password"]},
+    )
+    assert login.status_code == 200
+    assert anon_client.get("/api/auth/me").json()["username"] == "admin"
 
 
 def test_heartbeat_requires_key(client):
@@ -120,3 +156,87 @@ def test_stats_aggregate_closed_session(client):
 
     sessions = client.get("/api/sessions").json()
     assert sessions[0]["duration_seconds"] == 7200
+
+
+def test_user_management(client):
+    created = client.post(
+        "/api/users",
+        json={
+            "username": "viewer",
+            "email": "viewer@example.com",
+            "password": "viewer-password",
+            "role": "viewer",
+        },
+    )
+    assert created.status_code == 201, created.text
+    viewer_id = created.json()["id"]
+
+    users = client.get("/api/users").json()
+    assert {user["username"] for user in users} == {"admin", "viewer"}
+
+    updated = client.patch(
+        f"/api/users/{viewer_id}",
+        json={"role": "admin", "is_active": False},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["role"] == "admin"
+    assert updated.json()["is_active"] is False
+
+    self_delete = client.delete("/api/users/1")
+    assert self_delete.status_code == 400
+
+    deleted = client.delete(f"/api/users/{viewer_id}")
+    assert deleted.status_code == 204
+
+
+def test_settings_and_agent_key_rotation(client, agent_headers):
+    current = client.get("/api/settings")
+    assert current.status_code == 200
+    assert current.json()["agent_api_key_set"] is True
+
+    updated = client.patch(
+        "/api/settings",
+        json={"steam_id": "76561198000000000", "timezone": "Europe/London"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["steam_id"] == "76561198000000000"
+    assert updated.json()["timezone"] == "Europe/London"
+
+    rotated = client.post("/api/settings/agent-key/rotate")
+    assert rotated.status_code == 200
+    new_key = rotated.json()["agent_api_key"]
+
+    rejected = client.post(
+        "/api/heartbeat",
+        json=heartbeat_payload(),
+        headers=agent_headers,
+    )
+    assert rejected.status_code == 401
+
+    accepted = client.post(
+        "/api/heartbeat",
+        json=heartbeat_payload(),
+        headers={"X-Agent-Key": new_key},
+    )
+    assert accepted.status_code == 200
+
+
+def test_viewer_cannot_access_settings_or_users(anon_client, admin_credentials):
+    anon_client.post("/api/auth/setup", json=admin_credentials)
+    anon_client.post(
+        "/api/users",
+        json={
+            "username": "reader",
+            "password": "reader-password",
+            "role": "viewer",
+        },
+    )
+    anon_client.post("/api/auth/logout")
+    anon_client.post(
+        "/api/auth/login",
+        json={"identifier": "reader", "password": "reader-password"},
+    )
+
+    assert anon_client.get("/api/settings").status_code == 403
+    assert anon_client.get("/api/users").status_code == 403
+    assert anon_client.get("/api/stats/summary").status_code == 200

@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     igdb_sync_minutes: int = 60
     igdb_enrich_limit: int = 8
     steam_achievement_limit: int = 8
+    session_days: int = 7
+    cookie_secure: bool = False
 
     @property
     def steam_configured(self) -> bool:

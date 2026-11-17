@@ -1,6 +1,48 @@
-export type Page = 'overview' | 'library' | 'sessions'
+export type Page = 'overview' | 'library' | 'sessions' | 'settings'
 
 export type Theme = 'dark' | 'light'
+
+export type UserRole = 'admin' | 'viewer'
+
+export interface CurrentUser {
+  id: number
+  username: string
+  email: string | null
+  role: UserRole
+  is_active: boolean
+  locale: string
+  created_at: string
+  last_login_at: string | null
+}
+
+export interface AuthStatus {
+  needs_setup: boolean
+  authenticated: boolean
+  user: CurrentUser | null
+}
+
+export interface AppSettings {
+  steam_api_key_hint: string
+  steam_api_key_set: boolean
+  steam_id: string
+  igdb_client_id: string
+  igdb_client_secret_hint: string
+  igdb_client_secret_set: boolean
+  agent_api_key_hint: string
+  agent_api_key_set: boolean
+  timezone: string
+  steam_configured: boolean
+  igdb_configured: boolean
+}
+
+export interface SettingsUpdatePayload {
+  steam_api_key?: string
+  steam_id?: string
+  igdb_client_id?: string
+  igdb_client_secret?: string
+  agent_api_key?: string
+  timezone?: string
+}
 
 export interface Game {
   id: number

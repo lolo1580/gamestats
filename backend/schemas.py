@@ -1,8 +1,85 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    email: str | None
+    role: Literal["admin", "viewer"]
+    is_active: bool
+    locale: str
+    created_at: datetime
+    last_login_at: datetime | None
+
+
+class AuthStatusOut(BaseModel):
+    needs_setup: bool
+    authenticated: bool
+    user: UserOut | None
+
+
+class LoginIn(BaseModel):
+    identifier: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=1, max_length=256)
+
+
+class SetupIn(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+    email: str | None = Field(default=None, max_length=255)
+    password: str = Field(min_length=8, max_length=256)
+
+
+class PasswordChangeIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
+
+
+class UserCreateIn(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+    email: str | None = Field(default=None, max_length=255)
+    password: str = Field(min_length=8, max_length=256)
+    role: Literal["admin", "viewer"] = "viewer"
+
+
+class UserUpdateIn(BaseModel):
+    email: str | None = Field(default=None, max_length=255)
+    role: Literal["admin", "viewer"] | None = None
+    is_active: bool | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=256)
+
+
+class SettingsOut(BaseModel):
+    steam_api_key_hint: str
+    steam_api_key_set: bool
+    steam_id: str
+    igdb_client_id: str
+    igdb_client_secret_hint: str
+    igdb_client_secret_set: bool
+    agent_api_key_hint: str
+    agent_api_key_set: bool
+    timezone: str
+    steam_configured: bool
+    igdb_configured: bool
+
+
+class SettingsUpdate(BaseModel):
+    steam_api_key: str | None = None
+    steam_id: str | None = None
+    igdb_client_id: str | None = None
+    igdb_client_secret: str | None = None
+    agent_api_key: str | None = None
+    timezone: str | None = None
+
+
+class AgentKeyOut(BaseModel):
+    agent_api_key: str
 
 
 class HeartbeatGameIn(BaseModel):
