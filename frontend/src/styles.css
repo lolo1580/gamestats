@@ -3176,3 +3176,13 @@ code {
 .game-card__ubisoft + .game-card__empty {
   margin-top: 7px;
 }
+
+textarea.input {
+  height: auto;
+  min-height: 58px;
+  padding: 8px 10px;
+  resize: vertical;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
