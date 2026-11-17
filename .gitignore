@@ -35,3 +35,7 @@ agent-windows/dist/
 # Windows agent downloads (served by the backend)
 downloads/*.exe
 downloads/*.zip
+
+# Windows agent installers staged for the backend Docker image
+backend/downloads/*.exe
+backend/downloads/*.zip

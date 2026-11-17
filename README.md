@@ -122,7 +122,8 @@ is no default password. The Swagger and ReDoc pages require this session too.
 ## Preview Docker images
 
 The `Publish preview Docker images` workflow builds and pushes both images to
-the GitHub Container Registry on every push to `main` (and on manual dispatch):
+the GitHub Container Registry on every push to `main`, after a successful
+**Build Windows agent** run, and on manual dispatch:
 
 - `ghcr.io/lolo1580/gamestats-backend:preview-latest`
 - `ghcr.io/lolo1580/gamestats-frontend:preview-latest`
@@ -162,7 +163,9 @@ GAMESTATS_IMAGE_TAG=preview-2026-11-17-1 \
 ```
 
 The preview services use `pull_policy: always`, so `up -d` checks GHCR for a
-newer image. If the interface still looks old, force a browser refresh
+newer image. The backend image contains the Windows installer in
+`/opt/agent-downloads`; the optional `downloads/` host mount overrides it when it
+contains files. If the interface still looks old, force a browser refresh
 (`Ctrl+Shift+R`) and check the backend version:
 
 ```bash
@@ -354,12 +357,16 @@ Build it on Windows with `agent-windows\build.ps1`, or run the
 **Build Windows agent** GitHub Actions workflow and download the artifact. See
 [agent-windows/README.md](agent-windows/README.md) for details.
 
-The installer can also be served directly by the local GameStats server. Place
-`GameStatsAgentSetup.exe` (and optionally `GameStatsAgent-portable.zip`) in the
-`downloads/` directory at the repository root. The backend mounts it read-only
-at `/downloads`, and the files become available in
-**Settings → Général → Windows agent**. `agent-windows/build.ps1` copies new
-builds there automatically. The binaries are ignored by Git.
+The preview Docker images bundle the latest Windows agent automatically. The
+Docker workflow downloads the newest successful **Build Windows agent** artifact
+and copies it into the backend image, so **Settings → Général → Windows agent**
+shows the download buttons without any manual file copy.
+
+For source runs or custom images, `GameStatsAgentSetup.exe` and
+`GameStatsAgent-portable.zip` can be placed in the root `downloads/` directory.
+The backend checks that directory first, then the bundled `/opt/agent-downloads`
+copy. `agent-windows/build.ps1` copies new builds to `downloads/` automatically.
+The binaries are ignored by Git.
 
 The installed agent stores its configuration in `%APPDATA%\GameStats\agent.json`,
 the watched games in `%APPDATA%\GameStats\games.json`, and its log in

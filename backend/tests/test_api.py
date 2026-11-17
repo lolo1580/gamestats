@@ -1009,7 +1009,10 @@ def test_metadata_sync_maps_providers(client, monkeypatch):
 def test_agent_release_without_files(client, monkeypatch, tmp_path):
     monkeypatch.setattr(
         "routes_agent.get_settings",
-        lambda: SimpleNamespace(downloads_dir=str(tmp_path)),
+        lambda: SimpleNamespace(downloads_dir=str(tmp_path / "configured")),
+    )
+    monkeypatch.setattr(
+        "routes_agent.BUNDLED_DOWNLOADS_DIR", tmp_path / "bundled"
     )
     release = client.get("/api/agent/release")
     assert release.status_code == 200
@@ -1024,6 +1027,9 @@ def test_agent_release_serves_downloads(client, monkeypatch, tmp_path):
     monkeypatch.setattr(
         "routes_agent.get_settings",
         lambda: SimpleNamespace(downloads_dir=str(tmp_path)),
+    )
+    monkeypatch.setattr(
+        "routes_agent.BUNDLED_DOWNLOADS_DIR", tmp_path / "bundled"
     )
     (tmp_path / "GameStatsAgentSetup.exe").write_bytes(b"MZ-test-installer")
     (tmp_path / "GameStatsAgent-portable.zip").write_bytes(b"PK-test-portable")
@@ -1043,3 +1049,23 @@ def test_agent_release_serves_downloads(client, monkeypatch, tmp_path):
     assert portable.status_code == 200
     assert portable.content == b"PK-test-portable"
     assert "GameStatsAgent-portable.zip" in portable.headers["content-disposition"]
+
+def test_agent_release_falls_back_to_bundled(client, monkeypatch, tmp_path):
+    configured = tmp_path / "configured"
+    bundled = tmp_path / "bundled"
+    bundled.mkdir()
+    monkeypatch.setattr(
+        "routes_agent.get_settings",
+        lambda: SimpleNamespace(downloads_dir=str(configured)),
+    )
+    monkeypatch.setattr("routes_agent.BUNDLED_DOWNLOADS_DIR", bundled)
+    (bundled / "GameStatsAgentSetup.exe").write_bytes(b"MZ-bundled")
+
+    release = client.get("/api/agent/release").json()
+    assert release["installer_available"] is True
+    assert release["installer_size"] == len(b"MZ-bundled")
+    assert release["portable_available"] is False
+
+    download = client.get("/api/agent/download/installer")
+    assert download.status_code == 200
+    assert download.content == b"MZ-bundled"

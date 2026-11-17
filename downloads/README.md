@@ -1,11 +1,13 @@
-# Agent downloads
+# Agent downloads (optional override)
 
-Place the Windows agent files in this directory to make them available from the
-GameStats web interface under **Settings → General → Windows agent**:
+The Docker preview backend image already bundles the latest Windows agent from
+the **Build Windows agent** GitHub Actions artifact. Files placed here are used
+first and override the bundled copy at `/opt/agent-downloads`.
+
+For source runs, the backend reads this directory by default. Place:
 
 - `GameStatsAgentSetup.exe` — recommended installer;
 - `GameStatsAgent-portable.zip` — optional portable version.
 
-The files are served by the backend from `/downloads` in Docker and are ignored
-by Git. Build them with `agent-windows/build.ps1` (Windows) or download the
-artifact produced by the **Build Windows agent** GitHub Actions workflow.
+The files are served through **Settings → General → Windows agent**. Binaries in
+this directory are ignored by Git.

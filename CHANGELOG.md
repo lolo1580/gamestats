@@ -56,7 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   GHCR with `preview-latest` and `preview-YYYY-MM-DD-1` tags, plus a standalone
   `compose.preview.yml` file for running the published images.
 - Local agent download from the GameStats server: files placed in `downloads/`
-  are served by the backend and exposed in Settings → General.
+  are served by the backend and exposed in Settings → General. Preview Docker
+  images automatically bundle the latest Windows agent artifact.
 
 ### Changed
 

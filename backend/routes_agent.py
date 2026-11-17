@@ -13,10 +13,15 @@ router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 INSTALLER_NAME = "GameStatsAgentSetup.exe"
 PORTABLE_NAME = "GameStatsAgent-portable.zip"
+BUNDLED_DOWNLOADS_DIR = Path("/opt/agent-downloads")
 
 
-def _release_path(name: str) -> Path:
-    return Path(get_settings().downloads_dir).expanduser() / name
+def _release_candidates(name: str) -> list[Path]:
+    configured = Path(get_settings().downloads_dir).expanduser()
+    directories = [configured]
+    if BUNDLED_DOWNLOADS_DIR != configured:
+        directories.append(BUNDLED_DOWNLOADS_DIR)
+    return [directory / name for directory in directories]
 
 
 def _file_size(path: Path) -> int | None:
@@ -29,12 +34,18 @@ def _file_size(path: Path) -> int | None:
         return None
 
 
+def _release_info(name: str) -> tuple[Path | None, int | None]:
+    for path in _release_candidates(name):
+        size = _file_size(path)
+        if size is not None:
+            return path, size
+    return None, None
+
+
 @router.get("/release", response_model=AgentReleaseOut)
 def read_agent_release(_admin: AdminUser) -> dict:
-    installer = _release_path(INSTALLER_NAME)
-    portable = _release_path(PORTABLE_NAME)
-    installer_size = _file_size(installer)
-    portable_size = _file_size(portable)
+    _, installer_size = _release_info(INSTALLER_NAME)
+    _, portable_size = _release_info(PORTABLE_NAME)
     return {
         "installer_available": installer_size is not None,
         "installer_size": installer_size,
@@ -45,8 +56,8 @@ def read_agent_release(_admin: AdminUser) -> dict:
 
 @router.get("/download/installer", response_class=FileResponse)
 def download_agent_installer(_admin: AdminUser) -> FileResponse:
-    path = _release_path(INSTALLER_NAME)
-    if _file_size(path) is None:
+    path, _ = _release_info(INSTALLER_NAME)
+    if path is None:
         raise HTTPException(
             status_code=404,
             detail=(
@@ -63,8 +74,8 @@ def download_agent_installer(_admin: AdminUser) -> FileResponse:
 
 @router.get("/download/portable", response_class=FileResponse)
 def download_agent_portable(_admin: AdminUser) -> FileResponse:
-    path = _release_path(PORTABLE_NAME)
-    if _file_size(path) is None:
+    path, _ = _release_info(PORTABLE_NAME)
+    if path is None:
         raise HTTPException(
             status_code=404,
             detail=(
