@@ -41,7 +41,6 @@ french.StartupTask=Démarrer GameStats Agent à l'ouverture de session
 french.DesktopIcon=Créer un raccourci sur le Bureau
 french.AdditionalTasks=Options supplémentaires
 french.TestConnection=Tester la connexion maintenant
-french.LaunchAgent=Lancer GameStats Agent maintenant
 english.ConfigTitle=GameStats configuration
 english.ConfigSubtitle=GameStats server connection
 english.ConfigDescription=Enter the backend address and agent key. The key is available in GameStats under Settings → General → Agent key.
@@ -55,7 +54,6 @@ english.StartupTask=Start GameStats Agent at sign-in
 english.DesktopIcon=Create a desktop shortcut
 english.AdditionalTasks=Additional options
 english.TestConnection=Test the connection now
-english.LaunchAgent=Launch GameStats Agent now
 
 [Files]
 Source: "dist\GameStatsAgent\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -74,7 +72,6 @@ Name: "{userstartup}\GameStats Agent"; Filename: "{app}\{#MyAppExeName}"; Tasks:
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--once"; Description: "{cm:TestConnection}"; Flags: postinstall nowait skipifsilent
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchAgent}"; Flags: postinstall nowait skipifsilent unchecked
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/C taskkill /IM {#MyAppExeName} /F >NUL 2>&1"; Flags: runhidden
